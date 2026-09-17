@@ -1,5 +1,5 @@
 from utils.response_builder import success_response
-from schemas.dealer_schemas import Dealer
+from api.schemas.dealr_schemas import Dealer
 
 class DealerController:
     def search(self, query: str):

@@ -1,12 +1,13 @@
-class f1ndrModule:
-    name: str = "f1ndr"
-    version: str = "1.0.0"
+"""
+f1ndr module entrypoint.
+"""
 
-    def info(self) -> dict:
-        return {
-            "name": self.name,
-            "version": self.version,
-        }
+from f1ndr.core.core import run_search, run_intelligence
 
 
-f1ndr_module = f1ndrModule()
+def run(action: str, data: dict) -> dict:
+    if action == "search":
+        return run_search(data)
+    if action == "intelligence":
+        return run_intelligence(data)
+    raise ValueError(f"Invalid f1ndr action: {action}")

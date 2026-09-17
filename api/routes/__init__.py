@@ -1,13 +1,13 @@
-from .dealer_routes import router as dealer_router
-from .list_routes import router as list_router
-from .search_routes import router as search_router
-from .sell_routes_py import router as sell_router
-from .watch_routes import router as watch_router
+from .dealr_routes import router as dealr_router
+from .listr_routes import router as listr_router
+from .f1ndr_routes import router as f1ndr_router
+from .sellr_routes import router as sellr_router
+from .watchr_routes import router as watchr_router
 
 __all__ = [
-    "dealer_router",
-    "list_router",
-    "search_router",
-    "sell_router",
-    "watch_router",
+    "dealr_router",
+    "listr_router",
+    "f1ndr_router",
+    "sellr_router",
+    "watchr_router",
 ]

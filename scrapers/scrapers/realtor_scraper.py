@@ -1,65 +1,39 @@
-# scrapers/scrapers/realtor_scraper.py
-
-import traceback
-import httpx
+from typing import Dict, List
 from bs4 import BeautifulSoup
+from scrapers.base_scraper import BaseScraper
 
-PLATFORM = "realtor"
-
-
-async def fetch_html(url: str) -> str | None:
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(url)
-            resp.raise_for_status()
-            return resp.text
-    except Exception:
-        traceback.print_exc()
-        return None
+BASE_URL = "https://www.realtor.ca/map#ZoomLevel=11&Center=51.0447,-114.0719"
 
 
-def parse_html(html: str) -> list[dict]:
-    if not html:
-        return []
+class RealtorScraper(BaseScraper):
+    source_name = "realtor"
 
-    soup = BeautifulSoup(html, "html.parser")
-    listings = []
+    def run(self) -> Dict:
+        html = self.fetch_html(BASE_URL)
+        if not html:
+            return {"source": self.source_name, "results": []}
+        return {"source": self.source_name, "results": self.parse(html)}
 
-    # TODO: replace selectors with real Realtor.ca structure
-    for item in soup.select(".listing"):
-        listings.append({
-            "title": item.select_one(".title").get_text(strip=True) if item.select_one(".title") else None,
-            "price": item.select_one(".price").get_text(strip=True) if item.select_one(".price") else None,
-            "url": item.select_one("a")["href"] if item.select_one("a") else None,
-            "image": item.select_one("img")["src"] if item.select_one("img") else None,
-            "location": item.select_one(".location").get_text(strip=True) if item.select_one(".location") else None,
-            "posted_at": None,
-            "platform": PLATFORM,
-        })
+    def parse(self, html: str) -> List[Dict[str, str]]:
+        soup = BeautifulSoup(html, "html.parser")
+        cards = soup.select(".listingCard")
 
-    return listings
+        listings: List[Dict[str, str]] = []
 
+        for card in cards:
+            title_el = card.select_one(".listingCardAddress")
+            price_el = card.select_one(".listingCardPrice")
+            link_el = card.select_one("a")
 
-def build_url(query: str | None) -> str:
-    base = "https://www.realtor.ca/map#Search="
-    return f"{base}{query or ''}"
+            if not title_el or not link_el:
+                continue
 
+            listings.append(
+                {
+                    "title": title_el.get_text(strip=True),
+                    "price": price_el.get_text(strip=True) if price_el else "N/A",
+                    "url": link_el.get("href") or "",
+                }
+            )
 
-async def run(query: str | None = None) -> dict:
-    try:
-        url = build_url(query)
-        html = await fetch_html(url)
-        listings = parse_html(html)
-
-        return {
-            "success": True,
-            "listings": listings,
-            "error": None,
-        }
-    except Exception as e:
-        traceback.print_exc()
-        return {
-            "success": False,
-            "listings": [],
-            "error": str(e),
-        }
+        return listings

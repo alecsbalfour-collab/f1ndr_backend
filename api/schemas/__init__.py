@@ -1,4 +1,4 @@
-from .dealer_schemas import Dealer, DealerSearchRequest, DealerSearchResponse
+from .dealr_schemas import Dealer, DealerSearchRequest, DealerSearchResponse
 from .list_schemas import Listing, ListingSearchRequest, ListingSearchResponse
 from .search_schema import SearchRequest, SearchResult
 from .sell_schemas import SellItem, SellRequest, SellResponse

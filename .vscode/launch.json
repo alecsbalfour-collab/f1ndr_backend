@@ -2,19 +2,14 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "f1ndr Backend (Uvicorn Direct)",
+            "name": "Debug f1ndr_backend",
             "type": "debugpy",
             "request": "launch",
-            "module": "uvicorn",
-            "args": [
-                "run_backend:app",
-                "--reload",
-                "--port",
-                "8000"
-            ],
+            "program": "${workspaceFolder}/module.py",
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}",
-            "justMyCode": true
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
         }
     ]
 }

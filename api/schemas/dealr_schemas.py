@@ -1,15 +1,15 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
-class Dealer(BaseModel):
+class Dealr(BaseModel):
     id: str
     name: str
     city: Optional[str] = None
     province: Optional[str] = None
     phone: Optional[str] = None
 
-class DealerSearchRequest(BaseModel):
+class DealrSearchRequest(BaseModel):
     query: str
 
-class DealerSearchResponse(BaseModel):
-    results: list[Dealer]
+class DealrSearchResponse(BaseModel):
+    results: List[Dealr]

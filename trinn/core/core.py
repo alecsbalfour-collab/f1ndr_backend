@@ -1,0 +1,36 @@
+from trinn.config.config import get_trinn_config
+from trinn.db.trinn_repo import save_task, update_task_status
+from trinn.utils.scheduler import schedule_interval
+from f1ndr.scrapers.registry import run_scraper
+from f1ndr.vin.decode import decode_vin
+from watchr.core.core import scan_alerts
+from listr.core.core import update_listing
+
+
+def run_task(data: dict) -> dict:
+    config = get_trinn_config()
+    task_type = data.get("task")
+
+    if task_type == "scrape" and config["enable_scraper_tasks"]:
+        return run_scraper(data.get("platform"))
+
+    if task_type == "vin" and config["enable_vin_tasks"]:
+        return decode_vin(data.get("vin"))
+
+    if task_type == "watchr" and config["enable_watchr_tasks"]:
+        return scan_alerts()
+
+    if task_type == "sync" and config["enable_listing_sync"]:
+        return update_listing(data.get("platform"), data.get("listing"))
+
+    raise ValueError("Invalid or disabled trinn task")
+
+
+def schedule_task(data: dict) -> dict:
+    config = get_trinn_config()
+    interval = data.get("interval", config["default_interval_hours"])
+
+    schedule_interval(data, interval)
+    save_task(data)
+
+    return {"scheduled": True, "interval": interval}
