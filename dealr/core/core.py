@@ -4,6 +4,7 @@ from f1ndr.vin.decode import decode_vin
 from f1ndr.intelligence.market import compute_market_value
 from listr.core.core import push_listing, update_listing
 from trinn.core.core import schedule_sync
+import asyncio
 
 
 def ingest_inventory(data: dict) -> dict:
@@ -26,6 +27,13 @@ def sync_inventory(data: dict) -> dict:
     for platform in config["default_platforms"]:
         update_listing(platform, data)
 
-    schedule_sync(data, config["sync_interval_hours"])
+    # Run async schedule_sync in event loop
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    loop.run_until_complete(schedule_sync(data, config["sync_interval_hours"]))
     update_inventory_db(data)
     return data

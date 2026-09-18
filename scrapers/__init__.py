@@ -6,6 +6,7 @@ from .ebay_scraper import run as run_ebay
 from .facebook_scraper import run as run_facebook
 from .kijiji_scraper import run as run_kijiji
 from .marketplace_scraper import run as run_marketplace
+from .neighbourhood_scraper import run as run_neighbourhood
 from .realtor_scraper import run as run_realtor, scrape_realtor
 from .rentals_scraper import run as run_rentals
 from .rentfaster_scraper import run as run_rentfaster
@@ -20,6 +21,7 @@ scrape_ebay = run_ebay
 scrape_facebook = run_facebook
 scrape_kijiji = run_kijiji
 scrape_marketplace = run_marketplace
+scrape_neighbourhood = run_neighbourhood
 scrape_rentals = run_rentals
 scrape_rentfaster = run_rentfaster
 scrape_used = run_used
@@ -37,6 +39,7 @@ __all__ = [
     "run_facebook",
     "run_kijiji",
     "run_marketplace",
+    "run_neighbourhood",
     "run_realtor",
     "scrape_realtor",
     "run_rentals",
@@ -52,6 +55,7 @@ __all__ = [
     "scrape_facebook",
     "scrape_kijiji",
     "scrape_marketplace",
+    "scrape_neighbourhood",
     "scrape_rentals",
     "scrape_rentfaster",
     "scrape_used",

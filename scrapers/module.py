@@ -14,6 +14,7 @@ from scrapers.rentfaster_scraper import run as run_rentfaster
 from scrapers.used_scraper import run as run_used
 from scrapers.usedca_scraper import run as run_usedca
 from scrapers.zillow_scraper import run as run_zillow
+from scrapers.neighbourhood_scraper import run as run_neighbourhood
 
 
 SCRAPERS = {
@@ -29,61 +30,11 @@ SCRAPERS = {
     "usedca": run_usedca,
     "realtor": run_realtor,
     "zillow": run_zillow,
+    "neighbourhood": run_neighbourhood,
 }
 
-
-# Async wrappers for sync scrapers
-async def run_autotrader_async(query: str):
-    return run_autotrader(query)
-
-async def run_craigslist_async(query: str):
-    return run_craigslist(query)
-
-async def run_ebay_async(query: str):
-    return run_ebay(query)
-
-async def run_facebook_async(query: str):
-    return run_facebook(query)
-
-async def run_kijiji_async(query: str):
-    return run_kijiji(query)
-
-async def run_marketplace_async(query: str):
-    return run_marketplace(query)
-
-async def run_realtor_async(query: str):
-    return run_realtor(query)
-
-async def run_rentals_async(query: str):
-    return run_rentals(query)
-
-async def run_rentfaster_async(query: str):
-    return run_rentfaster(query)
-
-async def run_used_async(query: str):
-    return run_used(query)
-
-async def run_usedca_async(query: str):
-    return run_usedca(query)
-
-async def run_zillow_async(query: str):
-    return run_zillow(query)
-
-
-ASYNC_SCRAPERS = {
-    "autotrader": run_autotrader_async,
-    "craigslist": run_craigslist_async,
-    "ebay": run_ebay_async,
-    "facebook": run_facebook_async,
-    "kijiji": run_kijiji_async,
-    "marketplace": run_marketplace_async,
-    "rentals": run_rentals_async,
-    "rentfaster": run_rentfaster_async,
-    "used": run_used_async,
-    "usedca": run_usedca_async,
-    "realtor": run_realtor_async,
-    "zillow": run_zillow_async,
-}
+# All scrapers are now async, so ASYNC_SCRAPERS is the same as SCRAPERS
+ASYNC_SCRAPERS = SCRAPERS
 
 
 async def run_all(query: str):
@@ -103,12 +54,23 @@ async def run_all(query: str):
 async def _run_single(name: str, scraper_func, query: str):
     try:
         result = await scraper_func(query)
-        return {
-            "platform": name,
-            "success": True,
-            "listings": result.get("results", []),
-            "error": None,
-        }
+        # Handle different result formats from scrapers
+        if "success" in result:
+            # Used.ca format
+            return {
+                "platform": name,
+                "success": result.get("success", False),
+                "listings": result.get("listings", []),
+                "error": result.get("error"),
+            }
+        else:
+            # Standard format
+            return {
+                "platform": name,
+                "success": True,
+                "listings": result.get("results", []),
+                "error": result.get("error"),
+            }
     except Exception as e:
         return {
             "platform": name,

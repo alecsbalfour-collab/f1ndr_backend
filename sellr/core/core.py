@@ -4,6 +4,7 @@ from f1ndr.intelligence.market import compute_market_value
 from listr.core.core import push_listing
 from watchr.core.core import register_listing_alerts
 from trinn.core.core import schedule_sync
+import asyncio
 
 
 def validate_listing(data: dict, config: dict) -> dict:
@@ -58,7 +59,15 @@ def setup_alerts(listing: dict, config: dict):
 
 def schedule_listing_sync(listing: dict, config: dict):
     interval = config["auto_sync_interval_hours"]
-    schedule_sync(listing, interval)
+    
+    # Run async schedule_sync in event loop
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    loop.run_until_complete(schedule_sync(listing, interval))
 
 
 def create_listing(data: dict) -> dict:
