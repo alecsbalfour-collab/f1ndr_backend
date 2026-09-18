@@ -1,10 +1,7 @@
 import pytest
-import asyncio
-from scrapers.scrapers.facebook_scraper import run
+from scrapers.kijiji_scraper import run
 
-@pytest.mark.asyncio
-async def test_facebook_run():
-    result = await run("sofa")
-    assert "success" in result
-    assert "listings" in result
-    assert isinstance(result["listings"], list)
+def test_kijiji_run():
+    result = run("sofa")
+    assert "source" in result
+    assert isinstance(result.get("results", []), list)

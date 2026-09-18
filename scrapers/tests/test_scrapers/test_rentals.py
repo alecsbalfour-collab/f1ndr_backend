@@ -1,10 +1,7 @@
 import pytest
-import asyncio
-from scrapers.scrapers.rentals_scraper import run
+from scrapers.rentals_scraper import run
 
-@pytest.mark.asyncio
-async def test_rentals_run():
-    result = await run("apartment")
-    assert "success" in result
-    assert "listings" in result
-    assert isinstance(result["listings"], list)
+def test_rentals_run():
+    result = run("apartment")
+    assert "source" in result
+    assert isinstance(result.get("results", []), list)

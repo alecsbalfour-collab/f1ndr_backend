@@ -1,16 +1,16 @@
 def test_autotrader_scraper():
-    from f1ndr.scrapers import autotrader_scraper
-    result = autotrader_scraper.scrape({"q": "cars"})
-    assert result["status"] == "scraper_executed"
+    from scrapers import run_autotrader
+    result = run_autotrader("cars")
+    assert "source" in result
 
 
 def test_kijiji_scraper():
-    from f1ndr.scrapers import kijiji_scraper
-    result = kijiji_scraper.scrape({"q": "rentals"})
-    assert result["status"] == "scraper_executed"
+    from scrapers import run_kijiji
+    result = run_kijiji("rentals")
+    assert "source" in result
 
 
 def test_zillow_scraper():
-    from f1ndr.scrapers import zillow_scraper
-    result = zillow_scraper.scrape({"q": "homes"})
-    assert result["status"] == "scraper_executed"
+    from scrapers import run_zillow
+    result = run_zillow("homes")
+    assert "source" in result

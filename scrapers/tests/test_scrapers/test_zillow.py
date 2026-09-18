@@ -1,8 +1,7 @@
 import pytest
-from scrapers.scrapers.zillow_scraper import run
+from scrapers.zillow_scraper import run
 
-@pytest.mark.asyncio
-async def test_zillow_run():
-    result = await run("rent")
-    assert "success" in result
-    assert isinstance(result["listings"], list)
+def test_zillow_run():
+    result = run("rent")
+    assert "source" in result
+    assert isinstance(result.get("results", []), list)

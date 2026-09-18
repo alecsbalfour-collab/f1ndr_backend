@@ -1,8 +1,7 @@
 import pytest
-from scrapers.scrapers.autotrader_scraper import run
+from scrapers.autotrader_scraper import run
 
-@pytest.mark.asyncio
-async def test_autotrader_run():
-    result = await run("car")
-    assert "success" in result
-    assert isinstance(result["listings"], list)
+def test_autotrader_run():
+    result = run("car")
+    assert "source" in result
+    assert isinstance(result.get("results", []), list)

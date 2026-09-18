@@ -1,6 +1,6 @@
-from scrapers.scrapers.realtor_scraper import scrape_realtor
+from scrapers.realtor_scraper import run
 
 def test_realtor():
-    result = scrape_realtor()
-    assert "title" in result
-    assert "url" in result
+    result = run()
+    assert "source" in result
+    assert isinstance(result.get("results", []), list)

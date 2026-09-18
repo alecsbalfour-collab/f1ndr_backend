@@ -1,7 +1,7 @@
 from trinn.config.config import get_trinn_config
 from trinn.db.trinn_repo import save_task, update_task_status
 from trinn.utils.scheduler import schedule_interval
-from f1ndr.scrapers.registry import run_scraper
+from scrapers.module import SCRAPERS
 from f1ndr.vin.decode import decode_vin
 from watchr.core.core import scan_alerts
 from listr.core.core import update_listing
@@ -12,7 +12,12 @@ def run_task(data: dict) -> dict:
     task_type = data.get("task")
 
     if task_type == "scrape" and config["enable_scraper_tasks"]:
-        return run_scraper(data.get("platform"))
+        platform = data.get("platform")
+        scraper_func = SCRAPERS.get(platform)
+        if scraper_func:
+            return scraper_func(platform)
+        else:
+            raise ValueError(f"Unsupported scraper platform: {platform}")
 
     if task_type == "vin" and config["enable_vin_tasks"]:
         return decode_vin(data.get("vin"))
