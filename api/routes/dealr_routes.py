@@ -7,7 +7,7 @@ import logging
 from fastapi import APIRouter, Query, HTTPException
 from typing import Dict, Any, Optional
 from utils.response_builder import success_response, error_response, paginated_response
-from dealr.config.dealr_config import DEALR_CONFIG
+from dealr.config.dealr_config import dealr_config
 from dealr.core.core import ingest_inventory, sync_inventory
 
 
@@ -29,9 +29,9 @@ async def dealr_status() -> Dict[str, Any]:
             data={
                 "module": "dealr",
                 "status": "operational",
-                "feature_key": DEALR_CONFIG["feature_key"],
-                "feature_version": DEALR_CONFIG["feature_version"],
-                "enabled": DEALR_CONFIG["enabled"],
+                "feature_key": dealr_config["feature_key"],
+                "feature_version": dealr_config["feature_version"],
+                "enabled": dealr_config["enabled"],
             },
             message="Dealr module operational"
         )
