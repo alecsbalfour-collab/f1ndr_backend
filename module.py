@@ -1,9 +1,14 @@
-from fastapi import FastAPI
-from api.router_api import api_router
+from api.main import app
+import dealr
+import f1ndr
+import listr
+import sellr
+import trinn
 
-def create_app():
-    app = FastAPI()
-    app.include_router(api_router)
-    return app
-
-app = create_app()
+f1ndr_backend = {
+    "f1ndr": f1ndr.run,
+    "trinn": trinn.run,
+    "sellr": sellr.run,
+    "listr": listr.run,
+    "dealr": dealr.run,
+}

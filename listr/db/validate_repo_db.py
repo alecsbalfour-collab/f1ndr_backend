@@ -1,3 +1,6 @@
+from .mongo_client_db import MongoClientDB, mongo_client_db
+
+
 class ValidateRepoDB:
     def __init__(self, client: MongoClientDB):
         self.client = client

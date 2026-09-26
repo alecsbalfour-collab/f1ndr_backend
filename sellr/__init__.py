@@ -1,6 +1,7 @@
-from .module import sellr, build_sellr_module
+from .config import get_sellr_config
+from .module import run
 
 __all__ = [
-    "sellr",
-    "build_sellr_module",
+    "get_sellr_config",
+    "run",
 ]

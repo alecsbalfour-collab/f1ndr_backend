@@ -132,7 +132,7 @@ async def update_inventory(inventory_id: str, inventory_data: Dict[str, Any]) ->
     try:
         logger.info(f"Updating inventory: {inventory_id}")
         
-        processed_data = sync_inventory(inventory_data, 24)  # Default 24 hour sync
+        processed_data = await sync_inventory({**inventory_data, "id": inventory_id})
         
         return success_response(
             data=processed_data,

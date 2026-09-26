@@ -9,8 +9,8 @@ from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
 
 from trinn.config.config import get_trinn_config
-from trinn.db.trinn_repo import save_task, update_task_status
-from trinn.utils.scheduler import schedule_interval
+from trinn.db.trinn_repo import get_task_repo
+from trinn.utils.scheduler import get_scheduler
 from trinn.core.exceptions_core import TrinnError, ValidationError
 from scrapers.module import SCRAPER_CLASSES, run_scraper
 from f1ndr.vin.decode import decode_vin
@@ -36,11 +36,11 @@ async def run_task(data: Dict[str, Any]) -> Dict[str, Any]:
     logger.info(f"Executing TRINN task: {task_type}")
     
     try:
-        if task_type == "scrape" and config.enable_scraper_tasks:
+        if task_type == "scrape" and config["enable_scraper_tasks"]:
             return await _execute_scrape_task(data, config)
-        elif task_type == "vin" and config.enable_vin_tasks:
+        elif task_type == "vin" and config["enable_vin_tasks"]:
             return await _execute_vin_task(data, config)
-        elif task_type == "sync" and config.enable_listing_sync:
+        elif task_type == "sync" and config["enable_listing_sync"]:
             return await _execute_sync_task(data, config)
         else:
             raise ValidationError(f"Invalid or disabled trinn task: {task_type}")
@@ -126,7 +126,7 @@ async def schedule_task(data: Dict[str, Any]) -> Dict[str, Any]:
         Dictionary with scheduling confirmation and metadata
     """
     config = get_trinn_config()
-    interval = data.get("interval", config.default_interval_hours)
+    interval = data.get("interval", config["default_interval_hours"])
     
     logger.info(f"Scheduling TRINN task with interval: {interval} hours")
     
@@ -135,10 +135,13 @@ async def schedule_task(data: Dict[str, Any]) -> Dict[str, Any]:
         next_run = datetime.utcnow() + timedelta(hours=interval)
         
         # Schedule the task
-        schedule_interval(data, interval)
+        task_id = await get_scheduler().schedule_interval(data, interval)
         
-        # Save task to database
-        task_id = save_task(data)
+        # Save task to database when a repository has been initialized
+        try:
+            await get_task_repo().insert({**data, "task_id": task_id})
+        except RuntimeError:
+            logger.warning("Task repository not initialized; task scheduled in memory only")
         
         return {
             "scheduled": True,

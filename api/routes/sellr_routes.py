@@ -67,7 +67,7 @@ async def create_listing_endpoint(listing_data: Dict[str, Any]) -> Dict[str, Any
         logger.info(f"Creating listing: {listing_data.get('title', 'unknown')}")
         
         # Use sellr core functionality
-        listing = create_listing(listing_data)
+        listing = await create_listing(listing_data)
         
         # Save to database
         listing_id = save_listing(listing)

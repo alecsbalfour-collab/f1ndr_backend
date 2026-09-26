@@ -33,17 +33,17 @@ async def trinn_status() -> Dict[str, Any]:
         return {
             "module": "trinn",
             "status": "operational",
-            "feature_key": config.feature_key,
-            "feature_version": config.feature_version,
-            "enabled": config.enabled,
+            "feature_key": config["feature_key"],
+            "feature_version": config["feature_version"],
+            "enabled": config["enabled"],
             "config": {
-                "enable_scraper_tasks": config.enable_scraper_tasks,
-                "enable_vin_tasks": config.enable_vin_tasks,
-                "enable_watchr_tasks": config.enable_watchr_tasks,
-                "enable_listing_sync": config.enable_listing_sync,
-                "default_interval_hours": config.default_interval_hours,
+                "enable_scraper_tasks": config["enable_scraper_tasks"],
+                "enable_vin_tasks": config["enable_vin_tasks"],
+                "enable_watchr_tasks": config["enable_watchr_tasks"],
+                "enable_listing_sync": config["enable_listing_sync"],
+                "default_interval_hours": config["default_interval_hours"],
             },
-            "supported_platforms": config.supported_platforms,
+            "supported_platforms": config["supported_platforms"],
         }
         
     except Exception as e:
@@ -111,18 +111,18 @@ async def trinn_get_config() -> Dict[str, Any]:
         config = get_trinn_config()
         
         return {
-            "feature_key": config.feature_key,
-            "feature_version": config.feature_version,
-            "enabled": config.enabled,
-            "enable_scraper_tasks": config.enable_scraper_tasks,
-            "enable_vin_tasks": config.enable_vin_tasks,
-            "enable_watchr_tasks": config.enable_watchr_tasks,
-            "enable_listing_sync": config.enable_listing_sync,
-            "default_interval_hours": config.default_interval_hours,
-            "max_retries": config.max_retries,
-            "retry_delay": config.retry_delay,
-            "batch_size": config.batch_size,
-            "supported_platforms": config.supported_platforms,
+            "feature_key": config["feature_key"],
+            "feature_version": config["feature_version"],
+            "enabled": config["enabled"],
+            "enable_scraper_tasks": config["enable_scraper_tasks"],
+            "enable_vin_tasks": config["enable_vin_tasks"],
+            "enable_watchr_tasks": config["enable_watchr_tasks"],
+            "enable_listing_sync": config["enable_listing_sync"],
+            "default_interval_hours": config["default_interval_hours"],
+            "max_retries": config["max_retries"],
+            "retry_delay": config["retry_delay"],
+            "batch_size": config["batch_size"],
+            "supported_platforms": config["supported_platforms"],
         }
         
     except Exception as e:
@@ -142,7 +142,7 @@ async def trinn_health_check() -> Dict[str, Any]:
         config = get_trinn_config()
         
         return {
-            "status": "healthy" if config.enabled else "disabled",
+            "status": "healthy" if config["enabled"] else "disabled",
             "module": "trinn",
             "timestamp": _get_timestamp(),
         }

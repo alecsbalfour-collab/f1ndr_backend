@@ -9,6 +9,7 @@ from typing import Dict, Any, Optional
 from utils.response_builder import success_response, error_response, paginated_response
 from f1ndr.vin.decode import decode_vin
 from f1ndr.config.config import get_f1ndr_config
+from f1ndr.core.core import run_search, run_intelligence
 
 
 logger = logging.getLogger(__name__)
@@ -130,6 +131,24 @@ async def get_vehicles(
             status_code=500,
             error_code="GET_VEHICLES_ERROR"
         )
+
+
+@router.post("/search")
+async def search_endpoint(params: Dict[str, Any]) -> Dict[str, Any]:
+    try:
+        return success_response(data=run_search(params), message="Search completed")
+    except Exception as e:
+        logger.error(f"Search failed: {e}")
+        return error_response(message=f"Search failed: {str(e)}", status_code=500, error_code="SEARCH_ERROR")
+
+
+@router.post("/intelligence")
+async def intelligence_endpoint(listing: Dict[str, Any]) -> Dict[str, Any]:
+    try:
+        return success_response(data=run_intelligence(listing), message="Intelligence completed")
+    except Exception as e:
+        logger.error(f"Intelligence failed: {e}")
+        return error_response(message=f"Intelligence failed: {str(e)}", status_code=500, error_code="INTELLIGENCE_ERROR")
 
 
 @router.get("/market/value")

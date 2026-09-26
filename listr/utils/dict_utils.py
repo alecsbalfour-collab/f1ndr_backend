@@ -1,7 +1,6 @@
-from .post_data import POST_DATA
-from .validate_data import VALIDATE_DATA
+class DictUtils:
+    def compact(self, data: dict) -> dict:
+        return {k: v for k, v in data.items() if v is not None}
 
-__all__ = [
-    "POST_DATA",
-    "VALIDATE_DATA",
-]
+
+dict_utils = DictUtils()

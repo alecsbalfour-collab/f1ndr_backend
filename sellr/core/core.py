@@ -4,7 +4,6 @@ from f1ndr.intelligence.market import compute_market_value
 from listr.core.core import push_listing
 from watchr.core.core import register_listing_alerts
 from trinn.core.core import schedule_sync
-import asyncio
 
 
 def validate_listing(data: dict, config: dict) -> dict:
@@ -37,6 +36,8 @@ def apply_auto_pricing(data: dict, config: dict) -> dict:
         return data
 
     market_value = compute_market_value(data)
+    if not market_value:
+        return data
     floor = market_value * config["price_floor_percent"]
     ceiling = market_value * config["price_ceiling_percent"]
 
@@ -57,20 +58,11 @@ def setup_alerts(listing: dict, config: dict):
         register_listing_alerts(listing)
 
 
-def schedule_listing_sync(listing: dict, config: dict):
-    interval = config["auto_sync_interval_hours"]
-    
-    # Run async schedule_sync in event loop
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    
-    loop.run_until_complete(schedule_sync(listing, interval))
+async def schedule_listing_sync(listing: dict, config: dict):
+    await schedule_sync(listing, config["auto_sync_interval_hours"])
 
 
-def create_listing(data: dict) -> dict:
+async def create_listing(data: dict) -> dict:
     config = get_listings_config()
 
     listing = validate_listing(data, config)
@@ -78,6 +70,6 @@ def create_listing(data: dict) -> dict:
     listing = apply_auto_pricing(listing, config)
     push_to_marketplaces(listing, config)
     setup_alerts(listing, config)
-    schedule_listing_sync(listing, config)
+    await schedule_listing_sync(listing, config)
 
     return listing

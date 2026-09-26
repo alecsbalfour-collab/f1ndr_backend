@@ -25,4 +25,14 @@ DEALR_CONFIG = {
         "log_category": "dealr",
         "log_level": "INFO",
     },
+    "enable_vin_decode": True,
+    "enable_market_value": True,
+    "default_platforms": ["kijiji", "facebook", "autotrader"],
+    "sync_interval_hours": 24,
 }
+
+dealr_config = DEALR_CONFIG
+
+
+def get_dealr_config() -> dict:
+    return dict(DEALR_CONFIG)

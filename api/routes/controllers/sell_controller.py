@@ -18,7 +18,7 @@ class SellController:
     def __init__(self):
         logger.info("SellController initialized")
     
-    def create(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def create(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """
         Create new listing with enterprise validation and FlutterFlow compatibility.
         
@@ -32,7 +32,7 @@ class SellController:
             logger.info(f"Creating listing: {payload.get('title', 'unknown')}")
             
             # Use sellr core functionality
-            listing = create_listing(payload)
+            listing = await create_listing(payload)
             
             return created_response(
                 data={"listing": listing},

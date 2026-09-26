@@ -2,8 +2,12 @@
 Config for listing creation.
 """
 
-def get_listings_config() -> dict:
+def get_sellr_config() -> dict:
     return {
+        "feature_key": "sellr",
+        "feature_version": "1.0.0",
+        "enabled": True,
+
         "max_title_length": 120,
         "min_price": 0,
 
@@ -24,3 +28,6 @@ def get_listings_config() -> dict:
 
         "auto_sync_interval_hours": 24,
     }
+
+
+get_listings_config = get_sellr_config

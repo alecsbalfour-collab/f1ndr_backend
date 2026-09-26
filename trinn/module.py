@@ -18,7 +18,7 @@ class TrinnModule:
     
     def __init__(self):
         self.config = get_trinn_config()
-        logger.info(f"TrinnModule initialized: {self.config.feature_key}")
+        logger.info(f"TrinnModule initialized: {self.config["feature_key"]}")
     
     async def run(self, action: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -43,8 +43,8 @@ class TrinnModule:
             
             # Add module-level metadata
             result["module_metadata"] = {
-                "feature_key": self.config.feature_key,
-                "feature_version": self.config.feature_version,
+                "feature_key": self.config["feature_key"],
+                "feature_version": self.config["feature_version"],
                 "action": action,
                 "timestamp": self._get_timestamp(),
             }
@@ -60,3 +60,13 @@ class TrinnModule:
         """Get current timestamp in ISO format."""
         from datetime import datetime
         return datetime.utcnow().isoformat()
+
+
+_module: TrinnModule | None = None
+
+
+async def run(action: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    global _module
+    if _module is None:
+        _module = TrinnModule()
+    return await _module.run(action, data)

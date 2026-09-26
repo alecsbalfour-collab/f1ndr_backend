@@ -112,7 +112,7 @@ class DealerController:
                 error_code="CREATE_DEALER_ERROR"
             )
     
-    def update_dealer(self, dealer_id: str, dealer_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def update_dealer(self, dealer_id: str, dealer_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Update existing dealer with enterprise validation and FlutterFlow compatibility.
         
@@ -127,7 +127,7 @@ class DealerController:
             logger.info(f"Updating dealer: {dealer_id}")
             
             # Use dealr core functionality
-            processed_data = sync_inventory(dealer_data)
+            processed_data = await sync_inventory({**dealer_data, "id": dealer_id})
             
             return success_response(
                 data=processed_data,

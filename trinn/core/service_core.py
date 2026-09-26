@@ -46,7 +46,7 @@ class TrinnService:
         self.task_repo = task_repo
         
         self.metrics = ServiceMetrics()
-        logger.info(f"TrinnService initialized with config: {self.config.feature_key}")
+        logger.info(f"TrinnService initialized with config: {self.config['feature_key']}")
     
     async def run_pipeline(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """

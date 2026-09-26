@@ -7,12 +7,13 @@ import logging
 from fastapi import APIRouter, Query, HTTPException
 from typing import Dict, Any, Optional
 from utils.response_builder import success_response, error_response, paginated_response
-from listr.core.core import get_listr_config, push_listing, update_listing
+from listr.config.config import get_listr_config
+from listr.core.core import push_listing, update_listing
 
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/listr", tags=["listr"])
+router = APIRouter(tags=["listr"])
 
 
 @router.get("/status")
@@ -99,7 +100,7 @@ async def update_listing_endpoint(listing_id: str, listing_data: Dict[str, Any],
         logger.info(f"Updating listing {listing_id} on platform: {platform}")
         
         # Use listr core functionality
-        result = update_listing(platform, listing_data)
+        result = update_listing(platform, {**listing_data, "id": listing_id})
         
         return success_response(
             data=result,

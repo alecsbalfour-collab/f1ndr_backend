@@ -3,4 +3,5 @@
 TRINN package initializer.
 """
 
-from .module import TrinnModule
+from .config.config import get_trinn_config
+from .module import TrinnModule, run

@@ -5,7 +5,7 @@ f1ndr module entrypoint.
 from f1ndr.core.core import run_search, run_intelligence
 
 
-def run(action: str, data: dict) -> dict:
+async def run(action: str, data: dict) -> dict:
     if action == "search":
         return run_search(data)
     if action == "intelligence":

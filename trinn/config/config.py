@@ -4,7 +4,7 @@ DICT-aligned TRINN configuration with enterprise features.
 
 import os
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import Dict, List, Any, Optional
 
 
@@ -46,9 +46,9 @@ class TrinnConfig:
             self.supported_platforms = ["kijiji", "facebook", "autotrader", "craigslist", "ebay"]
 
 
-def get_trinn_config() -> TrinnConfig:
+def get_trinn_config() -> Dict[str, Any]:
     """Get TRINN module configuration from environment variables."""
-    return TrinnConfig(
+    return asdict(TrinnConfig(
         enable_scraper_tasks=os.getenv("ENABLE_SCRAPER_TASKS", "true").lower() == "true",
         enable_vin_tasks=os.getenv("ENABLE_VIN_TASKS", "true").lower() == "true",
         enable_watchr_tasks=os.getenv("ENABLE_WATCHR_TASKS", "true").lower() == "true",
@@ -58,18 +58,5 @@ def get_trinn_config() -> TrinnConfig:
         retry_delay=float(os.getenv("TRINN_RETRY_DELAY", "1.0")),
         batch_size=int(os.getenv("TRINN_BATCH_SIZE", "100")),
         log_level=os.getenv("TRINN_LOG_LEVEL", "INFO"),
-    )
+    ))
 
-
-# Import moved to function level to avoid circular import
-def run(action: str, data: dict) -> dict:
-    from trinn.core.core import run_task, schedule_task
-    
-    config = get_trinn_config()
-    logger.info(f"TRINN action: {action} with config: {config.feature_key}")
-    
-    if action == "run":
-        return run_task(data)
-    if action == "schedule":
-        return schedule_task(data)
-    raise ValueError(f"Invalid trinn action: {action}")
