@@ -1,12 +1,15 @@
-import pytest
-from scrapers.marketplace_scraper import run, MarketplaceScraper
+from scrapers.marketplace_scraper import MarketplaceScraper
 
-def test_marketplace_run_callable():
-    """Test that the run function is callable."""
-    assert callable(run)
+HTML = '<a href="/marketplace/item/42/"><span>$60</span><span>Office chair</span><span>Airdrie, AB</span></a>'
 
-def test_marketplace_scraper_class():
-    """Test that the MarketplaceScraper class can be instantiated."""
+
+def test_parse_uses_its_own_platform_name():
+    [listing] = MarketplaceScraper().parse(HTML)
+    assert listing["title"] == "Office chair"
+    assert listing["platform"] == "marketplace"
+
+
+def test_build_url():
     scraper = MarketplaceScraper()
-    assert scraper.config is not None
-    assert scraper.config.headless is True
+    assert scraper.build_url(None) == "https://www.facebook.com/marketplace/calgary/"
+    assert scraper.build_url("chair") == "https://www.facebook.com/marketplace/calgary/search?query=chair"

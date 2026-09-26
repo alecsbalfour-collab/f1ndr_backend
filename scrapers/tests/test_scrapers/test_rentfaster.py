@@ -1,12 +1,20 @@
-import pytest
-from scrapers.rentfaster_scraper import run, RentFasterScraper
+from scrapers.rentfaster_scraper import RentFasterScraper
 
-def test_rentfaster_run_callable():
-    """Test that the run function is callable."""
-    assert callable(run)
+HTML = """
+<div class="listing-item">
+  <a class="listing-link" href="/ab/calgary/rentals/apartment/1-bedroom/beltline/12345">
+    <h3 class="listing-title">1 Bed Apartment in Beltline</h3></a>
+  <span class="listing-price">$1,495</span>
+  <span class="listing-details">1 bed, 1 bath</span>
+  <span class="listing-community">Beltline</span>
+</div>
+"""
 
-def test_rentfaster_scraper_class():
-    """Test that the RentFasterScraper class can be instantiated."""
-    scraper = RentFasterScraper()
-    assert scraper.config is not None
-    assert scraper.config.headless is True
+
+def test_parse():
+    assert RentFasterScraper().parse(HTML) == [{
+        "title": "1 Bed Apartment in Beltline", "price": "$1,495", "details": "1 bed, 1 bath",
+        "location": "Beltline",
+        "url": "https://www.rentfaster.ca/ab/calgary/rentals/apartment/1-bedroom/beltline/12345",
+        "price_value": 1495.0, "platform": "rentfaster",
+    }]

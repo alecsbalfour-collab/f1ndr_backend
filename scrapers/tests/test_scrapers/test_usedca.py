@@ -1,12 +1,16 @@
-import pytest
-from scrapers.usedca_scraper import run, UsedCAScraper
+from scrapers.usedca_scraper import UsedCAScraper
 
-def test_usedca_run_callable():
-    """Test that the run function is callable."""
-    assert callable(run)
+HTML = """
+<div class="listing">
+  <a class="title" href="/classifieds/cars/2014-jeep-wrangler/987">2014 Jeep Wrangler</a>
+  <span class="price">$24,000</span>
+</div>
+"""
 
-def test_usedca_scraper_class():
-    """Test that the UsedCAScraper class can be instantiated."""
-    scraper = UsedCAScraper()
-    assert scraper.config is not None
-    assert scraper.config.headless is True
+
+def test_parse():
+    [listing] = UsedCAScraper().parse(HTML)
+    assert listing["title"] == "2014 Jeep Wrangler"
+    assert listing["url"] == "https://www.usedcalgary.com/classifieds/cars/2014-jeep-wrangler/987"
+    assert listing["price_value"] == 24000.0
+    assert listing["platform"] == "usedca"

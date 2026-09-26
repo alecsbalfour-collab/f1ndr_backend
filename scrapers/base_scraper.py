@@ -1,197 +1,214 @@
 """
-Enterprise Playwright Base Scraper
+Playwright base scraper shared by every platform scraper.
 
-DICT-aligned base scraper with enterprise features:
-- Async Playwright support
-- Comprehensive error handling
-- Logging integration
-- Rate limiting
-- Retry logic
-- Resource cleanup
-- Headers management
-- Response validation
+Subclasses declare where to go and what to extract:
+    source_name, base_url, search_url, card_selector, fields, link_selector
+and override build_url / parse_card only when a platform needs custom logic.
+
+Every run() returns the same dict shape and never raises:
+    {source, query, url, success, results, count, error, cached, duration_ms, scraped_at}
 """
 
 import asyncio
 import logging
-from typing import Optional, Dict, List, Any
-from playwright.async_api import async_playwright, Browser, Page, BrowserContext
-from dataclasses import dataclass
 import random
+import time
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+from urllib.parse import quote, quote_plus, urljoin
 
+from bs4 import BeautifulSoup, Tag
+from playwright.async_api import async_playwright
+
+from scrapers.config.settings_config import ScraperConfig
+from scrapers.core.metrics_core import metrics_registry
+from scrapers.core.normalization_core import parse_price
+from scrapers.core.resilience_core import CircuitOpenError, breaker_registry
+from scrapers.db.cache_db import cache_get, cache_set
 
 logger = logging.getLogger(__name__)
 
+MAX_QUERY_LENGTH = 200
 
-@dataclass
-class ScraperConfig:
-    """Enterprise scraper configuration."""
-    headless: bool = True
-    timeout: int = 30000
-    wait_until: str = "networkidle"
-    user_agent: Optional[str] = None
-    viewport_width: int = 1920
-    viewport_height: int = 1080
-    max_retries: int = 3
-    retry_delay: float = 1.0
-    rate_limit_delay: float = 0.5
+
+class ScrapeError(RuntimeError):
+    """Raised when a page could not be loaded after all retries."""
+
+
+def sanitize_query(query: Optional[str]) -> Optional[str]:
+    """Collapse whitespace and cap length; reject non-string input."""
+    if query is None:
+        return None
+    if not isinstance(query, str):
+        raise ValueError("query must be a string")
+    cleaned = " ".join(query.split())[:MAX_QUERY_LENGTH]
+    return cleaned or None
 
 
 class BaseScraper:
-    """Enterprise Playwright base scraper with DICT patterns."""
-    
+    source_name: str = "base"
+    base_url: str = ""
+    search_url: str = ""
+    card_selector: str = ""
+    wait_selector: Optional[str] = None
+    link_selector: str = "a[href]"
+    fields: Dict[str, str] = {}
+    slug_query: bool = False
+
     def __init__(self, config: Optional[ScraperConfig] = None):
-        self.config = config or ScraperConfig()
-        self.source_name = "base"
-        self._browser: Optional[Browser] = None
-        self._context: Optional[BrowserContext] = None
-        self._page: Optional[Page] = None
-        
-    async def _initialize_browser(self) -> None:
-        """Initialize Playwright browser with enterprise settings."""
-        if self._browser is None:
-            playwright = await async_playwright().start()
-            self._browser = await playwright.chromium.launch(
-                headless=self.config.headless
-            )
-            
-            # Set up context with realistic user agent
-            user_agent = self.config.user_agent or self._get_default_user_agent()
-            self._context = await self._browser.new_context(
-                user_agent=user_agent,
-                viewport={
-                    'width': self.config.viewport_width,
-                    'height': self.config.viewport_height
-                }
-            )
-            
-            # Set up page
-            self._page = await self._context.new_page()
-            self._page.set_default_timeout(self.config.timeout)
-            
-    def _get_default_user_agent(self) -> str:
-        """Get a realistic user agent string."""
-        return (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        self.config = config or ScraperConfig.from_env()
+        self.breaker = breaker_registry.get(
+            self.source_name,
+            self.config.breaker_failure_threshold,
+            self.config.breaker_reset_seconds,
         )
-    
-    async def _cleanup(self) -> None:
-        """Clean up browser resources."""
-        if self._page:
-            await self._page.close()
-            self._page = None
-        if self._context:
-            await self._context.close()
-            self._context = None
-        if self._browser:
-            await self._browser.close()
-            self._browser = None
-    
-    async def fetch_html(
-        self, 
-        url: str, 
-        wait_selector: Optional[str] = None,
-        retries: int = 0
-    ) -> Optional[str]:
+        self.metrics = metrics_registry.get(self.source_name)
+
+    def build_url(self, query: Optional[str]) -> str:
+        """Search URL for `query`, or the default browse page when there is none.
+        Platforms that take the query as a path segment set slug_query=True."""
+        if not (query and self.search_url):
+            return self.base_url
+        encoded = quote(query.lower().replace(" ", "-")) if self.slug_query else quote_plus(query)
+        return self.search_url.format(query=encoded)
+
+    def absolute_url(self, href: Optional[str]) -> Optional[str]:
+        return urljoin(self.base_url, href) if href else None
+
+    @staticmethod
+    def text(node: Tag, selector: str) -> Optional[str]:
+        element = node.select_one(selector)
+        return (element.get_text(" ", strip=True) or None) if element else None
+
+    def parse_card(self, card: Tag) -> Optional[Dict[str, Any]]:
+        listing = {name: self.text(card, selector) for name, selector in self.fields.items()}
+        link = card if card.name == "a" and card.get("href") else card.select_one(self.link_selector)
+        listing["url"] = self.absolute_url(link.get("href")) if link else None
+        return listing
+
+    def parse(self, html: str) -> List[Dict[str, Any]]:
+        soup = BeautifulSoup(html, "html.parser")
+        listings: List[Dict[str, Any]] = []
+        seen_urls = set()
+        for card in soup.select(self.card_selector):
+            try:
+                listing = self.parse_card(card)
+            except Exception as e:
+                logger.warning("%s: skipping unparseable card: %s", self.source_name, e)
+                continue
+            if not listing or not listing.get("title") or not listing.get("url"):
+                continue
+            if listing["url"] in seen_urls:
+                continue
+            seen_urls.add(listing["url"])
+            listing["price_value"] = parse_price(listing.get("price"))
+            listing["platform"] = self.source_name
+            listings.append(listing)
+        return listings
+
+    async def fetch_html(self, url: str) -> str:
         """
-        Fetch HTML content with enterprise error handling and retry logic.
-        
-        Args:
-            url: Target URL
-            wait_selector: CSS selector to wait for before returning
-            retries: Current retry count
-            
-        Returns:
-            HTML content or None if failed
+        Load `url` in headless Chromium and return the rendered HTML.
+        Navigation errors are retried with exponential backoff + jitter.
+        A missing result selector is not retried: the page loaded, it just has
+        no cards (empty search or a block page), so its HTML is returned as-is.
         """
-        try:
-            await self._initialize_browser()
-            
-            # Navigate to URL
-            await self._page.goto(
-                url, 
-                wait_until=self.config.wait_until,
-                timeout=self.config.timeout
-            )
-            
-            # Wait for specific selector if provided
-            if wait_selector:
-                try:
-                    await self._page.wait_for_selector(
-                        wait_selector, 
-                        timeout=self.config.timeout
-                    )
-                except Exception as e:
-                    logger.warning(
-                        f"Selector {wait_selector} not found for {self.source_name}: {e}"
-                    )
-            
-            # Rate limiting
-            await asyncio.sleep(self.config.rate_limit_delay)
-            
-            # Get HTML content
-            html = await self._page.content()
-            
-            logger.info(f"Successfully fetched HTML from {url} for {self.source_name}")
-            return html
-            
-        except Exception as e:
-            logger.error(f"Error fetching HTML from {url} for {self.source_name}: {e}")
-            
-            # Retry logic
-            if retries < self.config.max_retries:
-                delay = self.config.retry_delay * (2 ** retries) + random.uniform(0, 1)
-                logger.info(f"Retrying {self.source_name} in {delay:.2f}s (attempt {retries + 1})")
-                await asyncio.sleep(delay)
-                return await self.fetch_html(url, wait_selector, retries + 1)
-            
-            return None
-    
-    async def fetch_multiple_pages(
+        cfg = self.config
+        async with async_playwright() as playwright:
+            browser = await playwright.chromium.launch(headless=cfg.headless)
+            try:
+                context = await browser.new_context(
+                    user_agent=cfg.user_agent,
+                    viewport={"width": cfg.viewport_width, "height": cfg.viewport_height},
+                    locale=cfg.locale,
+                )
+                last_error: Optional[Exception] = None
+                for attempt in range(cfg.max_retries + 1):
+                    page = await context.new_page()
+                    try:
+                        await page.goto(url, wait_until=cfg.wait_until, timeout=cfg.timeout_ms)
+                        try:
+                            await page.wait_for_selector(
+                                self.wait_selector or self.card_selector,
+                                timeout=cfg.selector_timeout_ms,
+                            )
+                        except Exception:
+                            logger.warning("%s: no result cards found at %s", self.source_name, url)
+                        return await page.content()
+                    except Exception as e:
+                        last_error = e
+                        logger.warning(
+                            "%s: attempt %d/%d failed for %s: %s",
+                            self.source_name, attempt + 1, cfg.max_retries + 1, url, e,
+                        )
+                        if attempt < cfg.max_retries:
+                            await asyncio.sleep(
+                                cfg.retry_delay * 2 ** attempt + random.uniform(0, cfg.retry_delay)
+                            )
+                    finally:
+                        await page.close()
+                raise ScrapeError(f"{self.source_name}: failed to load {url}: {last_error}")
+            finally:
+                await browser.close()
+
+    def _result(
         self,
-        urls: List[str],
-        wait_selector: Optional[str] = None
-    ) -> List[Optional[str]]:
-        """
-        Fetch multiple pages concurrently with rate limiting.
-        
-        Args:
-            urls: List of URLs to fetch
-            wait_selector: CSS selector to wait for
-            
-        Returns:
-            List of HTML contents (None for failed requests)
-        """
-        results = []
-        for url in urls:
-            html = await self.fetch_html(url, wait_selector)
-            results.append(html)
-            # Additional delay between requests
-            await asyncio.sleep(self.config.rate_limit_delay)
-        return results
-    
-    async def run(self) -> Dict[str, Any]:
-        """
-        Main run method to be implemented by subclasses.
-        
-        Returns:
-            Dictionary with source and results
-        """
-        raise NotImplementedError("Subclasses must implement run method")
-    
-    async def __aenter__(self):
-        """Async context manager entry."""
-        await self._initialize_browser()
-        return self
-    
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit."""
-        await self._cleanup()
-    
-    async def close(self) -> None:
-        """Explicit cleanup method."""
-        await self._cleanup()
+        query: Optional[str],
+        url: Optional[str],
+        started: float,
+        listings: Optional[List[Dict[str, Any]]] = None,
+        error: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        listings = listings or []
+        return {
+            "source": self.source_name,
+            "query": query,
+            "url": url,
+            "success": error is None,
+            "results": listings,
+            "count": len(listings),
+            "error": error,
+            "cached": False,
+            "duration_ms": round((time.perf_counter() - started) * 1000, 1),
+            "scraped_at": datetime.now(timezone.utc).isoformat(),
+        }
 
+    async def run(self, query: Optional[str] = None) -> Dict[str, Any]:
+        started = time.perf_counter()
+        try:
+            query = sanitize_query(query)
+            url = self.build_url(query)
+        except ValueError as e:
+            return self._result(None, None, started, error=str(e))
 
+        cache_key = f"{self.source_name}:{url}"
+        if self.config.cache_ttl_seconds:
+            cached = await cache_get(cache_key)
+            if cached is not None:
+                self.metrics.record_cache_hit()
+                return {**cached, "cached": True}
 
+        try:
+            self.breaker.before_call()
+        except CircuitOpenError as e:
+            self.metrics.record_rejected()
+            logger.warning(str(e))
+            return self._result(query, url, started, error=str(e))
+
+        try:
+            logger.info("%s: scraping %s", self.source_name, url)
+            listings = self.parse(await self.fetch_html(url))
+        except Exception as e:
+            self.breaker.record_failure()
+            result = self._result(query, url, started, error=str(e))
+            self.metrics.record_failure(result["duration_ms"], str(e))
+            logger.error("%s: scrape failed: %s", self.source_name, e)
+            return result
+
+        self.breaker.record_success()
+        result = self._result(query, url, started, listings=listings)
+        self.metrics.record_success(result["duration_ms"], result["count"])
+        logger.info("%s: %d listings in %.0fms", self.source_name, result["count"], result["duration_ms"])
+        if self.config.cache_ttl_seconds:
+            await cache_set(cache_key, result, ttl=self.config.cache_ttl_seconds)
+        return result

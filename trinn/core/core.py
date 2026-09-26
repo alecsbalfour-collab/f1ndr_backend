@@ -12,7 +12,7 @@ from trinn.config.config import get_trinn_config
 from trinn.db.trinn_repo import save_task, update_task_status
 from trinn.utils.scheduler import schedule_interval
 from trinn.core.exceptions_core import TrinnError, ValidationError
-from scrapers.module import SCRAPERS
+from scrapers.module import SCRAPER_CLASSES, run_scraper
 from f1ndr.vin.decode import decode_vin
 from listr.core.core import update_listing
 
@@ -53,35 +53,21 @@ async def run_task(data: Dict[str, Any]) -> Dict[str, Any]:
 async def _execute_scrape_task(data: Dict[str, Any], config) -> Dict[str, Any]:
     """Execute scraper task with enterprise error handling."""
     platform = data.get("platform")
-    scraper_func = SCRAPERS.get(platform)
-    
-    if not scraper_func:
+    if platform not in SCRAPER_CLASSES:
         raise ValidationError(f"Unsupported scraper platform: {platform}")
-    
-    # Execute with retry logic
-    max_retries = config.max_retries
-    retry_delay = config.retry_delay
-    
-    for attempt in range(max_retries):
-        try:
-            logger.info(f"Scrape attempt {attempt + 1}/{max_retries} for platform: {platform}")
-            result = await scraper_func(platform)
-            
-            return {
-                "task": "scrape",
-                "platform": platform,
-                "status": "completed",
-                "result": result,
-                "attempts": attempt + 1,
-                "timestamp": datetime.utcnow().isoformat(),
-            }
-            
-        except Exception as e:
-            logger.warning(f"Scrape attempt {attempt + 1} failed: {e}")
-            if attempt < max_retries - 1:
-                await asyncio.sleep(retry_delay * (2 ** attempt))
-            else:
-                raise TrinnError(f"Scraper task failed after {max_retries} attempts: {str(e)}")
+
+    # Retries, backoff and circuit breaking are handled inside the scraper.
+    result = await run_scraper(platform, data.get("query"))
+    if not result["success"]:
+        raise TrinnError(f"Scraper task failed for {platform}: {result['error']}")
+
+    return {
+        "task": "scrape",
+        "platform": platform,
+        "status": "completed",
+        "result": result,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
 
 
 async def _execute_vin_task(data: Dict[str, Any], config) -> Dict[str, Any]:

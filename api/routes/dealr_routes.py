@@ -33,7 +33,7 @@ async def dealr_status() -> Dict[str, Any]:
                 "feature_version": dealr_config["feature_version"],
                 "enabled": dealr_config["enabled"],
             },
-            message="Dealr module operational"
+            message="dealr module operational"
         )
         
     except Exception as e:

@@ -1,149 +1,25 @@
 """
-Enterprise Rentals Scraper using Playwright
-
-DICT-aligned scraper with enterprise features:
-- Async Playwright support
-- Comprehensive error handling
-- Logging integration
-- Rate limiting
-- Retry logic
+Rentals.ca scraper. The query is a city slug (e.g. "calgary", "edmonton"), defaulting to Calgary.
 """
 
-import asyncio
-import logging
-from typing import Dict, List, Any
-from bs4 import BeautifulSoup
-from scrapers.base_scraper import BaseScraper, ScraperConfig
+from typing import Any, Dict, Optional
 
-
-logger = logging.getLogger(__name__)
-
-
-BASE_URL = "https://rentals.ca/calgary"
+from scrapers.base_scraper import BaseScraper
 
 
 class RentalsScraper(BaseScraper):
-    """Enterprise Rentals scraper with Playwright."""
-    
     source_name = "rentals_ca"
-    
-    def __init__(self, config: ScraperConfig = None):
-        super().__init__(config or ScraperConfig(
-            headless=True,
-            timeout=30000,
-            wait_until="networkidle",
-            max_retries=3,
-            rate_limit_delay=1.0
-        ))
-
-    async def run(self, query: str = None) -> Dict[str, Any]:
-        """
-        Run the Rentals scraper with enterprise error handling.
-        
-        Args:
-            query: Optional search query
-            
-        Returns:
-            Dictionary with source and results
-        """
-        try:
-            url = BASE_URL
-            if query:
-                url = f"https://rentals.ca/calgary?search={query}"
-            
-            logger.info(f"Starting Rentals scraper for URL: {url}")
-            
-            html = await self.fetch_html(
-                url, 
-                wait_selector=".listing-card"
-            )
-            
-            if not html:
-                logger.warning(f"No HTML content retrieved for {self.source_name}")
-                return {
-                    "source": self.source_name, 
-                    "results": [],
-                    "error": "Failed to fetch HTML content"
-                }
-            
-            listings = self.parse(html)
-            logger.info(f"Successfully parsed {len(listings)} listings from {self.source_name}")
-            
-            return {
-                "source": self.source_name, 
-                "results": listings,
-                "count": len(listings),
-                "error": None
-            }
-            
-        except Exception as e:
-            logger.error(f"Error in {self.source_name} scraper: {e}")
-            return {
-                "source": self.source_name, 
-                "results": [],
-                "error": str(e)
-            }
-        finally:
-            await self._cleanup()
-
-    def parse(self, html: str) -> List[Dict[str, str]]:
-        """
-        Parse Rentals HTML content with enterprise error handling.
-        
-        Args:
-            html: HTML content to parse
-            
-        Returns:
-            List of listing dictionaries
-        """
-        try:
-            soup = BeautifulSoup(html, "html.parser")
-            cards = soup.select(".listing-card")
-
-            listings: List[Dict[str, str]] = []
-
-            for card in cards:
-                try:
-                    title_el = card.select_one(".address")
-                    price_el = card.select_one(".price")
-                    link_el = card.select_one("a")
-                    bedrooms_el = card.select_one(".bedrooms")
-                    location_el = card.select_one(".location")
-
-                    if not title_el or not link_el:
-                        continue
-
-                    listing = {
-                        "title": title_el.get_text(strip=True),
-                        "price": price_el.get_text(strip=True) if price_el else "N/A",
-                        "url": link_el.get("href") or "",
-                        "bedrooms": bedrooms_el.get_text(strip=True) if bedrooms_el else "N/A",
-                        "location": location_el.get_text(strip=True) if location_el else "N/A",
-                        "platform": self.source_name
-                    }
-                    
-                    listings.append(listing)
-                    
-                except Exception as e:
-                    logger.warning(f"Error parsing individual listing: {e}")
-                    continue
-
-            return listings
-            
-        except Exception as e:
-            logger.error(f"Error parsing HTML content: {e}")
-            return []
+    base_url = "https://rentals.ca/calgary"
+    search_url = "https://rentals.ca/{query}"
+    card_selector = "div.listing-card, article.listing-card"
+    link_selector = "a.listing-card__details-link, a[href*='rentals.ca/'], a[href^='/']"
+    fields = {
+        "title": ".listing-card__title, .listing-card__address, .address",
+        "price": ".listing-card__price, .price",
+        "details": ".listing-card__main-features, .listing-card__details, .bedrooms",
+    }
+    slug_query = True
 
 
-async def run(query: str = None) -> Dict[str, Any]:
-    """
-    Convenience function to run the Rentals scraper.
-    
-    Args:
-        query: Optional search query
-        
-    Returns:
-        Scraper results dictionary
-    """
-    scraper = RentalsScraper()
-    return await scraper.run(query)
+async def run(query: Optional[str] = None) -> Dict[str, Any]:
+    return await RentalsScraper().run(query)
