@@ -12,10 +12,9 @@ pytestmark = pytest.mark.skipif(
 
 def test_required_env_vars():
     required = [
-        "MONGO_URI",
+        "MONGODB_URI",
         "ENVIRONMENT",
-        "JWT_SECRET",
-        "JWT_ALGORITHM",
+        "JWT_SECRET_KEY",
     ]
 
     for key in required:
@@ -24,4 +23,4 @@ def test_required_env_vars():
 
 def test_environment_is_valid():
     env = os.getenv("ENVIRONMENT")
-    assert env in ["development", "staging", "production"]
+    assert env in ["development", "test", "staging", "production"]

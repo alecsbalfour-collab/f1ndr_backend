@@ -19,19 +19,19 @@ def _prepare(platform: str, listing: dict) -> tuple:
     return config, prepared
 
 
-def push_listing(platform: str, listing: dict) -> dict:
+async def push_listing(platform: str, listing: dict) -> dict:
     _, prepared = _prepare(platform, listing)
-    save_listing(platform, prepared)
+    await save_listing(platform, prepared)
     return {"platform": platform, "status": "pushed", "listing": prepared}
 
 
-def update_listing(platform: str, listing: dict) -> dict:
+async def update_listing(platform: str, listing: dict) -> dict:
     _, prepared = _prepare(platform, listing)
-    updated = update_listing_db(platform, prepared)
+    updated = await update_listing_db(platform, prepared)
     return {"platform": platform, "status": "updated" if updated else "created", "listing": prepared}
 
 
-def remove_listing(platform: str, listing: dict) -> dict:
+async def remove_listing(platform: str, listing: dict) -> dict:
     _, prepared = _prepare(platform, listing)
-    removed = remove_listing_db(platform, prepared)
+    removed = await remove_listing_db(platform, prepared)
     return {"platform": platform, "status": "removed" if removed else "not_found", "listing_id": prepared.get("id")}

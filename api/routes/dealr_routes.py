@@ -9,6 +9,7 @@ from typing import Dict, Any, Optional
 from utils.response_builder import success_response, error_response, paginated_response
 from dealr.config.dealr_config import dealr_config
 from dealr.core.core import ingest_inventory, sync_inventory
+from dealr.db import inventory_repo
 
 
 logger = logging.getLogger(__name__)
@@ -59,7 +60,7 @@ async def create_inventory(inventory_data: Dict[str, Any]) -> Dict[str, Any]:
     try:
         logger.info(f"Creating inventory: {inventory_data.get('name', 'unknown')}")
         
-        processed_data = ingest_inventory(inventory_data)
+        processed_data = await ingest_inventory(inventory_data)
         
         return success_response(
             data=processed_data,
@@ -96,13 +97,11 @@ async def get_inventory(
     try:
         logger.info(f"Getting inventory - page: {page}, status: {status}")
         
-        # TODO: Implement actual database query
-        results = []
-        total = 0
+        result = await inventory_repo.list_inventory(status, page, page_size)
         
         return paginated_response(
-            data=results,
-            total=total,
+            data=result["items"],
+            total=result["total"],
             page=page,
             page_size=page_size,
             message="Inventory retrieved"
@@ -162,7 +161,12 @@ async def delete_inventory(inventory_id: str) -> Dict[str, Any]:
     try:
         logger.info(f"Deleting inventory: {inventory_id}")
         
-        # TODO: Implement actual database deletion
+        if not await inventory_repo.delete_inventory(inventory_id):
+            return error_response(
+                message="Inventory not found",
+                status_code=404,
+                error_code="NOT_FOUND"
+            )
         return success_response(
             message="Inventory deleted successfully"
         )

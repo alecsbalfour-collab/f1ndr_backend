@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 _client:   Optional[AsyncIOMotorClient]   = None
 _database: Optional[AsyncIOMotorDatabase] = None
+_owns_client: bool = True
 
 
 async def init_db() -> None:
@@ -22,13 +23,20 @@ async def init_db() -> None:
     logger.info("MongoDB connected — database: %s", settings.mongodb_db_name)
 
 
+async def attach_database(client: AsyncIOMotorClient, database: AsyncIOMotorDatabase) -> None:
+    """Use the backend's shared connection instead of opening a dealr-specific one."""
+    global _client, _database, _owns_client
+    _client, _database, _owns_client = client, database, False
+    await _ensure_indexes(_database)
+    logger.info("dealr attached to shared MongoDB database: %s", database.name)
+
+
 async def close_db() -> None:
-    global _client, _database
-    if _client is not None:
+    global _client, _database, _owns_client
+    if _client is not None and _owns_client:
         _client.close()
-        _client   = None
-        _database = None
         logger.info("MongoDB connection closed.")
+    _client, _database, _owns_client = None, None, True
 
 
 def get_client() -> AsyncIOMotorClient:

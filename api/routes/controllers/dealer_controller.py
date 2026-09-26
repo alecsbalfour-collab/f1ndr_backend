@@ -82,7 +82,7 @@ class DealerController:
                 error_code="GET_DEALER_ERROR"
             )
     
-    def create_dealer(self, dealer_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def create_dealer(self, dealer_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Create new dealer with enterprise validation and FlutterFlow compatibility.
         
@@ -96,7 +96,7 @@ class DealerController:
             logger.info(f"Creating dealer with data: {dealer_data.get('name', 'unknown')}")
             
             # Use dealr core functionality
-            processed_data = ingest_inventory(dealer_data)
+            processed_data = await ingest_inventory(dealer_data)
             
             return success_response(
                 data=processed_data,

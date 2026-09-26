@@ -70,6 +70,23 @@ def test_endpoints(client, method, path, body, expected):
     assert payload.get("success", True) is not False, payload
 
 
+def test_sellr_listing_crud_roundtrip(client):
+    created = client.post("/sellr/listings", json={"title": "Civic", "price": 7500, "user_id": "u-crud"}).json()["data"]
+    listing_id = created["id"]
+    assert client.get(f"/sellr/listings/{listing_id}").json()["data"]["title"] == "Civic"
+    assert client.get("/sellr/listings?user_id=u-crud").json()["data"]["total"] == 1
+    assert client.put(f"/sellr/listings/{listing_id}", json={"price": 7000}).json()["data"]["price"] == 7000
+    assert client.delete(f"/sellr/listings/{listing_id}").json()["success"] is True
+    assert client.get(f"/sellr/listings/{listing_id}").json()["success"] is False
+
+
+def test_dealr_inventory_crud_roundtrip(client):
+    created = client.post("/dealr/inventory", json={"name": "Lot CRUD", "status": "crud"}).json()["data"]
+    assert client.get("/dealr/inventory?status=crud").json()["pagination"]["total"] == 1
+    assert client.delete(f"/dealr/inventory/{created['id']}").json()["success"] is True
+    assert client.delete(f"/dealr/inventory/{created['id']}").json()["success"] is False
+
+
 def test_sellr_keeps_price_when_market_value_unknown(client):
     response = client.post("/sellr/listings", json={"title": "Civic", "price": 7500})
     assert response.json()["data"]["price"] == 7500

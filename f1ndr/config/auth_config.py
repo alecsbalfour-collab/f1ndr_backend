@@ -54,7 +54,7 @@ class AuthConfig:
             self.oauth_providers = ["google", "apple", "facebook"]
         
         # Override with environment variables if available
-        self.secret_key = os.getenv("JWT_SECRET", self.secret_key)
+        self.secret_key = os.getenv("JWT_SECRET_KEY", self.secret_key)
         self.token_expiry_minutes = int(os.getenv("TOKEN_EXPIRY_MINUTES", str(self.token_expiry_minutes)))
         self.flutterflow_app_id = os.getenv("FLUTTERFLOW_APP_ID", self.flutterflow_app_id)
         self.flutterflow_api_key = os.getenv("FLUTTERFLOW_API_KEY", self.flutterflow_api_key)

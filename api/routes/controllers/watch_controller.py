@@ -53,7 +53,7 @@ class WatchController:
                 error_code="WATCH_SEARCH_ERROR"
             )
     
-    def create_watch(self, watch_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def create_watch(self, watch_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Create new watch item with enterprise validation and FlutterFlow compatibility.
         
@@ -67,7 +67,7 @@ class WatchController:
             logger.info(f"Creating watch item: {watch_data.get('title', 'unknown')}")
             
             # Use watchr core functionality
-            alerts = scan_alerts()
+            alerts = await scan_alerts()
             
             return success_response(
                 data={"watch_item": watch_data, "alerts": alerts},

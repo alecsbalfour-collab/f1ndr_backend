@@ -9,7 +9,7 @@ from typing import Dict, Any, Optional
 from utils.response_builder import success_response, error_response, paginated_response
 from sellr.config.config import get_listings_config
 from sellr.core.core import create_listing
-from sellr.utils.utils import save_listing, update_listing, delete_listing, get_listing, get_user_listings
+from sellr.utils.utils import save_listing, update_listing, delete_listing, get_listing, get_user_listings, list_listings
 
 
 logger = logging.getLogger(__name__)
@@ -70,7 +70,7 @@ async def create_listing_endpoint(listing_data: Dict[str, Any]) -> Dict[str, Any
         listing = await create_listing(listing_data)
         
         # Save to database
-        listing_id = save_listing(listing)
+        listing_id = await save_listing(listing)
         listing["id"] = listing_id
         
         return success_response(
@@ -114,20 +114,17 @@ async def get_listings(
         
         if user_id:
             # Get user-specific listings
-            result = get_user_listings(user_id, status, page, page_size)
+            result = await get_user_listings(user_id, status, page, page_size)
             return success_response(
                 data=result,
                 message="User listings retrieved"
             )
         else:
-            # Get all listings with filters
-            # TODO: Implement general listing query
-            results = []
-            total = 0
+            result = await list_listings({"status": status, "platform": platform}, page, page_size)
             
             return paginated_response(
-                data=results,
-                total=total,
+                data=result["listings"],
+                total=result["total"],
                 page=page,
                 page_size=page_size,
                 message="Listings retrieved"
@@ -156,7 +153,7 @@ async def get_listing_endpoint(listing_id: str) -> Dict[str, Any]:
     try:
         logger.info(f"Getting listing: {listing_id}")
         
-        listing = get_listing(listing_id)
+        listing = await get_listing(listing_id)
         
         if listing:
             return success_response(
@@ -194,18 +191,18 @@ async def update_listing_endpoint(listing_id: str, listing_data: Dict[str, Any])
     try:
         logger.info(f"Updating listing: {listing_id}")
         
-        success = update_listing(listing_id, listing_data)
+        success = await update_listing(listing_id, listing_data)
         
         if success:
             return success_response(
-                data=listing_data,
+                data=await get_listing(listing_id),
                 message="Listing updated successfully"
             )
         else:
             return error_response(
-                message="Failed to update listing",
-                status_code=500,
-                error_code="UPDATE_FAILED"
+                message="Listing not found",
+                status_code=404,
+                error_code="NOT_FOUND"
             )
         
     except Exception as e:
@@ -231,7 +228,7 @@ async def delete_listing_endpoint(listing_id: str) -> Dict[str, Any]:
     try:
         logger.info(f"Deleting listing: {listing_id}")
         
-        success = delete_listing(listing_id)
+        success = await delete_listing(listing_id)
         
         if success:
             return success_response(
@@ -239,9 +236,9 @@ async def delete_listing_endpoint(listing_id: str) -> Dict[str, Any]:
             )
         else:
             return error_response(
-                message="Failed to delete listing",
-                status_code=500,
-                error_code="DELETE_FAILED"
+                message="Listing not found",
+                status_code=404,
+                error_code="NOT_FOUND"
             )
         
     except Exception as e:

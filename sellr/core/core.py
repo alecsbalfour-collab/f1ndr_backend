@@ -45,17 +45,17 @@ def apply_auto_pricing(data: dict, config: dict) -> dict:
     return {**data, "price": price}
 
 
-def push_to_marketplaces(listing: dict, config: dict):
+async def push_to_marketplaces(listing: dict, config: dict):
     if not config["allow_multi_platform"]:
         return
 
     for platform in config["default_platforms"]:
-        push_listing(platform, listing)
+        await push_listing(platform, listing)
 
 
-def setup_alerts(listing: dict, config: dict):
+async def setup_alerts(listing: dict, config: dict):
     if config["enable_watchr_alerts"]:
-        register_listing_alerts(listing)
+        await register_listing_alerts(listing)
 
 
 async def schedule_listing_sync(listing: dict, config: dict):
@@ -68,8 +68,8 @@ async def create_listing(data: dict) -> dict:
     listing = validate_listing(data, config)
     listing = autofill_from_vin(listing, config)
     listing = apply_auto_pricing(listing, config)
-    push_to_marketplaces(listing, config)
-    setup_alerts(listing, config)
+    await push_to_marketplaces(listing, config)
+    await setup_alerts(listing, config)
     await schedule_listing_sync(listing, config)
 
     return listing

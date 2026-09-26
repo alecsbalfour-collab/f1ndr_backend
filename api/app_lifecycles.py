@@ -1,18 +1,18 @@
 # f1ndr_backend/api/app_lifecycles.py
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
-from f1ndr_backend.api.startup import on_startup
-from f1ndr_backend.api.shutdown import on_shutdown
 
-def register_lifecycle_events(app: FastAPI):
-    """
-    Registers startup and shutdown lifecycle events for the FastAPI app.
-    """
+from api.startup import on_startup
+from api.shutdown import on_shutdown
 
-    @app.on_event("startup")
-    async def startup_event():
-        await on_startup()
 
-    @app.on_event("shutdown")
-    async def shutdown_event():
-        await on_shutdown()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """FastAPI lifespan: runs startup before serving and shutdown after."""
+    await on_startup(app)
+    try:
+        yield
+    finally:
+        await on_shutdown(app)

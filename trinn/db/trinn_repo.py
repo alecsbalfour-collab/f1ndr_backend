@@ -190,6 +190,12 @@ def initialize_task_repo(client) -> TaskRepository:
     return _task_repo
 
 
+def reset_task_repo() -> None:
+    """Detach the task repository (e.g. on shutdown)."""
+    global _task_repo
+    _task_repo = None
+
+
 def get_task_repo() -> TaskRepository:
     """Get the global task repository instance."""
     if _task_repo is None:

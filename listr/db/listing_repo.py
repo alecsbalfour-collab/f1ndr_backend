@@ -1,30 +1,27 @@
 """
-Repository for marketplace listings.
-
-In-memory store keyed by (platform, listing id); swap for Mongo later.
+Repository for marketplace listings, keyed by platform + listing id.
 """
 
 import uuid
-from threading import RLock
 
-_LISTINGS: dict = {}
-_LOCK = RLock()
+from db.document_store import DocumentStore
+
+listings_store = DocumentStore("listr_listings", key="key", indexes=("platform", "id"))
 
 
-def save_listing(platform: str, listing: dict):
-    with _LOCK:
-        listing.setdefault("id", str(uuid.uuid4()))
-        _LISTINGS[(platform, listing["id"])] = listing
+def _keyed(platform: str, listing: dict) -> dict:
+    listing.setdefault("id", str(uuid.uuid4()))
+    return {**listing, "key": f"{platform}:{listing['id']}"}
+
+
+async def save_listing(platform: str, listing: dict):
+    await listings_store.upsert(_keyed(platform, listing))
     return True
 
 
-def update_listing_db(platform: str, listing: dict):
-    with _LOCK:
-        existed = (platform, listing.get("id")) in _LISTINGS
-        save_listing(platform, listing)
-    return existed
+async def update_listing_db(platform: str, listing: dict):
+    return await listings_store.upsert(_keyed(platform, listing))
 
 
-def remove_listing_db(platform: str, listing: dict):
-    with _LOCK:
-        return _LISTINGS.pop((platform, listing.get("id")), None) is not None
+async def remove_listing_db(platform: str, listing: dict):
+    return await listings_store.delete(f"{platform}:{listing.get('id')}")

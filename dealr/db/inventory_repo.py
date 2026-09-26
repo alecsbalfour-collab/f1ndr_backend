@@ -2,9 +2,37 @@
 Repository for dealer inventory.
 """
 
-def save_inventory(inv: dict):
-    return True
+import uuid
+from datetime import datetime
+from typing import Optional
+
+from db.document_store import DocumentStore
+
+inventory_store = DocumentStore("dealr_inventory", key="id", indexes=("status", "vin"))
 
 
-def update_inventory_db(inv: dict):
-    return True
+async def save_inventory(inv: dict) -> str:
+    now = datetime.utcnow().isoformat()
+    inv.setdefault("id", str(uuid.uuid4()))
+    inv.setdefault("status", "active")
+    inv.setdefault("created_at", now)
+    inv["updated_at"] = now
+    await inventory_store.upsert(inv)
+    return inv["id"]
+
+
+async def update_inventory_db(inv: dict) -> bool:
+    existing = await inventory_store.get(inv["id"]) or {}
+    merged = {**existing, **inv, "updated_at": datetime.utcnow().isoformat()}
+    merged.setdefault("created_at", merged["updated_at"])
+    return await inventory_store.upsert(merged)
+
+
+async def list_inventory(status: Optional[str] = None, page: int = 1, page_size: int = 20) -> dict:
+    query = {"status": status} if status else {}
+    items = await inventory_store.find(query, skip=(page - 1) * page_size, limit=page_size, sort=("created_at", -1))
+    return {"items": items, "total": await inventory_store.count(query)}
+
+
+async def delete_inventory(inventory_id: str) -> bool:
+    return await inventory_store.delete(inventory_id)

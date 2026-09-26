@@ -10,9 +10,9 @@ async def run(action: str, data: dict) -> dict:
     if action == "create":
         return await create_listing(data)
     if action == "update":
-        return {"updated": update_listing(data["id"], data)}
+        return {"updated": await update_listing(data["id"], data)}
     if action == "remove":
-        return {"removed": delete_listing(data["id"])}
+        return {"removed": await delete_listing(data["id"])}
     if action == "get":
-        return {"listing": get_listing(data["id"])}
+        return {"listing": await get_listing(data["id"])}
     raise ValueError(f"Invalid sellr action: {action}")

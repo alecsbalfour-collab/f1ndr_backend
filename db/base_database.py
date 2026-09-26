@@ -385,7 +385,7 @@ async def get_database() -> BaseDatabase:
     if _database is None:
         from api.config.settings_config import get_settings
         settings = get_settings()
-        _database = BaseDatabase(settings.MONGO_URI, "f1ndr")
+        _database = BaseDatabase(settings.MONGODB_URI, settings.MONGODB_DB_NAME)
         await _database.connect()
     return _database
 

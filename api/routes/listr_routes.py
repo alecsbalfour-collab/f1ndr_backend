@@ -66,7 +66,7 @@ async def push_listing_endpoint(listing_data: Dict[str, Any], platform: str) -> 
         logger.info(f"Pushing listing to platform: {platform}")
         
         # Use listr core functionality
-        result = push_listing(platform, listing_data)
+        result = await push_listing(platform, listing_data)
         
         return success_response(
             data=result,
@@ -100,7 +100,7 @@ async def update_listing_endpoint(listing_id: str, listing_data: Dict[str, Any],
         logger.info(f"Updating listing {listing_id} on platform: {platform}")
         
         # Use listr core functionality
-        result = update_listing(platform, {**listing_data, "id": listing_id})
+        result = await update_listing(platform, {**listing_data, "id": listing_id})
         
         return success_response(
             data=result,

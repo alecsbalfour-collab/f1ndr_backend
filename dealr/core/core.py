@@ -6,7 +6,7 @@ from listr.core.core import update_listing
 from trinn.core.core import schedule_sync
 
 
-def ingest_inventory(data: dict) -> dict:
+async def ingest_inventory(data: dict) -> dict:
     config = get_dealr_config()
 
     if config["enable_vin_decode"] and "vin" in data:
@@ -16,7 +16,7 @@ def ingest_inventory(data: dict) -> dict:
     if config["enable_market_value"]:
         data["market_value"] = compute_market_value(data)
 
-    save_inventory(data)
+    await save_inventory(data)
     return data
 
 
@@ -24,8 +24,8 @@ async def sync_inventory(data: dict) -> dict:
     config = get_dealr_config()
 
     for platform in config["default_platforms"]:
-        update_listing(platform, data)
+        await update_listing(platform, data)
 
     await schedule_sync(data, config["sync_interval_hours"])
-    update_inventory_db(data)
+    await update_inventory_db(data)
     return data

@@ -101,7 +101,7 @@ async def _execute_sync_task(data: Dict[str, Any], config) -> Dict[str, Any]:
         raise ValidationError("Platform and listing are required for sync task")
     
     try:
-        result = update_listing(platform, listing)
+        result = await update_listing(platform, listing)
         
         return {
             "task": "sync",

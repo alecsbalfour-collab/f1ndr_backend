@@ -1,15 +1,25 @@
 # f1ndr_backend/api/startup.py
 
-async def on_startup():
-    """
-    Startup hook for initializing resources, connections, or background tasks.
-    Reconstructed because the original api/main.py depended on this.
-    Add your database connections or initialization logic here.
-    """
-    print("f1ndr backend is starting up...")
+import logging
 
-async def on_shutdown():
-    """
-    Shutdown hook for cleanup tasks.
-    """
-    print("f1ndr backend is shutting down...")
+from fastapi import FastAPI
+
+from db.connection_db import connect_to_db, get_client, get_database
+from db.document_store import ensure_all_indexes
+
+logger = logging.getLogger(__name__)
+
+
+async def on_startup(app: FastAPI) -> None:
+    """Open the shared Mongo connection and hand it to every module that persists data."""
+    if not await connect_to_db(app):
+        return
+
+    from dealr.db.client_db import attach_database
+    from trinn.db.trinn_repo import initialize_task_repo
+
+    database = get_database()
+    initialize_task_repo(database)
+    await attach_database(get_client(), database)
+    await ensure_all_indexes()
+    logger.info("Module storage initialized on MongoDB")
