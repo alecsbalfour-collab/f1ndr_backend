@@ -19,6 +19,12 @@ def client():
     return TestClient(app)
 
 
+@pytest.fixture(scope="module")
+def auth_headers():
+    from api.routes.auth_routes import create_access_token
+    return {"Authorization": f"Bearer {create_access_token('test-user')}"}
+
+
 @pytest.mark.parametrize("name", MODULES)
 def test_module_contract(name):
     pkg = importlib.import_module(name)
@@ -62,9 +68,9 @@ def test_entrypoints_import(entrypoint):
         ("put", "/dealr/inventory/inv1", {"name": "Lot A"}, 200),
     ],
 )
-def test_endpoints(client, method, path, body, expected):
+def test_endpoints(client, auth_headers, method, path, body, expected):
     kwargs = {"json": body} if body is not None else {}
-    response = getattr(client, method)(path, **kwargs)
+    response = getattr(client, method)(path, headers=auth_headers, **kwargs)
     assert response.status_code == expected, response.text
     payload = response.json()
     assert payload.get("success", True) is not False, payload
@@ -80,11 +86,64 @@ def test_sellr_listing_crud_roundtrip(client):
     assert client.get(f"/sellr/listings/{listing_id}").json()["success"] is False
 
 
-def test_dealr_inventory_crud_roundtrip(client):
-    created = client.post("/dealr/inventory", json={"name": "Lot CRUD", "status": "crud"}).json()["data"]
-    assert client.get("/dealr/inventory?status=crud").json()["pagination"]["total"] == 1
-    assert client.delete(f"/dealr/inventory/{created['id']}").json()["success"] is True
-    assert client.delete(f"/dealr/inventory/{created['id']}").json()["success"] is False
+def test_dealr_inventory_crud_roundtrip(client, auth_headers):
+    created = client.post("/dealr/inventory", json={"name": "Lot CRUD", "status": "crud"}, headers=auth_headers).json()["data"]
+    assert client.get("/dealr/inventory?status=crud", headers=auth_headers).json()["pagination"]["total"] == 1
+    assert client.delete(f"/dealr/inventory/{created['id']}", headers=auth_headers).json()["success"] is True
+    assert client.delete(f"/dealr/inventory/{created['id']}", headers=auth_headers).json()["success"] is False
+
+
+@pytest.mark.parametrize(
+    "method,path",
+    [
+        ("post", "/dealr/inventory"),
+        ("get", "/dealr/inventory"),
+        ("put", "/dealr/inventory/inv1"),
+        ("delete", "/dealr/inventory/inv1"),
+    ],
+)
+@pytest.mark.parametrize("token", [None, "not-a-jwt", "refresh"])
+def test_dealr_inventory_requires_access_token(client, method, path, token):
+    from api.routes.auth_routes import create_refresh_token
+    if token == "refresh":
+        token = create_refresh_token("test-user")
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    kwargs = {"json": {"name": "Lot"}} if method in ("post", "put") else {}
+    assert getattr(client, method)(path, headers=headers, **kwargs).status_code == 401
+
+
+def test_dealr_status_is_public(client):
+    assert client.get("/dealr/status").status_code == 200
+
+
+def test_cors_preflight_allows_browser_origin(client):
+    response = client.options(
+        "/dealr/inventory",
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "Authorization",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] in ("*", "http://localhost:3000")
+
+
+def test_cors_production_origins(monkeypatch):
+    from fastapi import FastAPI
+    from api.config.cors_config import apply_cors
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("CORS_ORIGINS", "https://dealr.example.com")
+    app = FastAPI()
+    app.get("/ping")(lambda: {"ok": True})
+    apply_cors(app)
+    c = TestClient(app)
+    allowed = lambda o: c.get("/ping", headers={"Origin": o}).headers.get("access-control-allow-origin")
+    assert allowed("https://dealr.example.com") == "https://dealr.example.com"
+    assert allowed("http://localhost:5173") == "http://localhost:5173"
+    assert allowed("https://shop.flutterflow.app") == "https://shop.flutterflow.app"
+    assert allowed("https://evil.com") is None
+    assert allowed("https://evil.com.flutterflow.app.attacker.io") is None
 
 
 def test_sellr_keeps_price_when_market_value_unknown(client):

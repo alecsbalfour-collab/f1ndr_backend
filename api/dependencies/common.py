@@ -1,5 +1,5 @@
 from fastapi import Depends
-from config import get_settings
+from api.config.settings_config import get_settings
 
 def get_app_settings():
     """

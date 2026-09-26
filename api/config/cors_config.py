@@ -4,6 +4,7 @@ DICT-aligned CORS configuration with FlutterFlow compatibility.
 """
 
 import os
+import re
 import logging
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
@@ -41,12 +42,17 @@ def apply_cors(app: FastAPI) -> None:
     if os.getenv("ENVIRONMENT", "development") == "development":
         logger.warning("Development mode: allowing all origins for CORS")
         allow_origins = ["*"]
+        allow_origin_regex = None
     else:
-        allow_origins = flutterflow_origins
+        # Starlette matches allow_origins literally, so wildcard entries go into a regex
+        allow_origins = [o for o in flutterflow_origins if "*" not in o]
+        patterns = [re.escape(o).replace(r"\*", "[A-Za-z0-9-]+") for o in flutterflow_origins if "*" in o]
+        allow_origin_regex = "|".join(patterns) or None
     
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allow_origins,
+        allow_origin_regex=allow_origin_regex,
         allow_credentials=True,  # Required for FlutterFlow authentication
         allow_methods=[
             "GET",

@@ -4,8 +4,9 @@ DICT-aligned dealr API routes with FlutterFlow compatibility and enterprise feat
 """
 
 import logging
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException
 from typing import Dict, Any, Optional
+from api.dependencies.auth import require_user
 from utils.response_builder import success_response, error_response, paginated_response
 from dealr.config.dealr_config import dealr_config
 from dealr.core.core import ingest_inventory, sync_inventory
@@ -46,7 +47,7 @@ async def dealr_status() -> Dict[str, Any]:
         )
 
 
-@router.post("/inventory")
+@router.post("/inventory", dependencies=[Depends(require_user)])
 async def create_inventory(inventory_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Create inventory with enterprise validation and FlutterFlow compatibility.
@@ -77,7 +78,7 @@ async def create_inventory(inventory_data: Dict[str, Any]) -> Dict[str, Any]:
         )
 
 
-@router.get("/inventory")
+@router.get("/inventory", dependencies=[Depends(require_user)])
 async def get_inventory(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -116,7 +117,7 @@ async def get_inventory(
         )
 
 
-@router.put("/inventory/{inventory_id}")
+@router.put("/inventory/{inventory_id}", dependencies=[Depends(require_user)])
 async def update_inventory(inventory_id: str, inventory_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Update inventory with enterprise validation and FlutterFlow compatibility.
@@ -147,7 +148,7 @@ async def update_inventory(inventory_id: str, inventory_data: Dict[str, Any]) ->
         )
 
 
-@router.delete("/inventory/{inventory_id}")
+@router.delete("/inventory/{inventory_id}", dependencies=[Depends(require_user)])
 async def delete_inventory(inventory_id: str) -> Dict[str, Any]:
     """
     Delete inventory with enterprise safety checks and FlutterFlow compatibility.
