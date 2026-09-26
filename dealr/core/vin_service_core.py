@@ -1,6 +1,22 @@
 import httpx
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from dealr.config import get_settings
+from dealr.data.models_data import VinDecodeResult
+
+
+def _detect_mismatches(
+    result: VinDecodeResult,
+    year: Optional[str],
+    make: Optional[str],
+    model: Optional[str],
+    trim: Optional[str],
+) -> List[str]:
+    """Compare dealer-entered fields with decoded VIN fields (case-insensitive)."""
+    flags = []
+    for name, entered, decoded in (("year", year, result.year), ("make", make, result.make), ("model", model, result.model)):
+        if entered is not None and decoded is not None and str(entered).strip().lower() != str(decoded).strip().lower():
+            flags.append(f"{name}_mismatch")
+    return flags
 
 
 class VinService:

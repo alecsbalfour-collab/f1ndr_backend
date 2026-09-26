@@ -48,8 +48,8 @@ class TestValidateVin:
     def test_real_world_vins(self) -> None:
         known_valid = [
             "1HGCM82633A004352",  # Honda Accord
-            "JH4KA8271NC000001",  # Acura
-            "WBAJB0C51BC613639",  # BMW
+            "1M8GDM9AXKP042788",  # ISO 3779 reference VIN (check digit X)
+            "11111111111111111",  # NHTSA check-digit sample
         ]
         for vin in known_valid:
             ok, _ = validate_vin(vin)

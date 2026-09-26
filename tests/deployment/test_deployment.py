@@ -2,6 +2,14 @@
 
 import os
 
+import pytest
+
+pytestmark = pytest.mark.skipif(
+    os.getenv("ENVIRONMENT") is None,
+    reason="Deployment checks only run when ENVIRONMENT is set",
+)
+
+
 def test_required_env_vars():
     required = [
         "MONGO_URI",

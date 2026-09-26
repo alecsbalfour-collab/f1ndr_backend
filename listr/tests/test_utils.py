@@ -1,6 +1,6 @@
-from utils.dict_utils import dict_utils
-from utils.post_utils import post_utils
-from utils.validation_utils import validation_utils
+from listr.utils.dict_utils import dict_utils
+from listr.utils.post_utils import post_utils
+from listr.utils.validation_utils import validation_utils
 
 def test_dict_utils_merge():
     merged = dict_utils.merge({"a": 1}, {"b": 2})

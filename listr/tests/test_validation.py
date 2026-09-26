@@ -1,4 +1,4 @@
-from core.validation_core import ValidationCore
+from listr.core.validation_core import ValidationCore
 
 def test_validation_missing_fields():
     validator = ValidationCore({"required_fields": ["title", "body"]})

@@ -1,5 +1,23 @@
 from typing import Optional, List, Dict
 from dealr.config import get_settings
+from dealr.core.errors_core import ForbiddenError, NotFoundError
+from dealr.data.models_data import VehicleListing, VehicleListingCreate
+from dealr.db.collections_db import get_listings_collection
+
+
+async def get_listing(dealer_id: str, listing_id: str) -> VehicleListing:
+    doc = await get_listings_collection().find_one({"listing_id": listing_id})
+    if not doc:
+        raise NotFoundError(f"Listing '{listing_id}' not found.")
+    if doc["dealer_id"] != dealer_id:
+        raise ForbiddenError("You do not have access to this listing.")
+    return VehicleListing(**{k: v for k, v in doc.items() if k != "_id"})
+
+
+async def create_listing(dealer_id: str, payload: VehicleListingCreate) -> VehicleListing:
+    listing = VehicleListing(dealer_id=dealer_id, **payload.model_dump())
+    await get_listings_collection().insert_one(listing.model_dump(mode="json"))
+    return listing
 
 
 class ListingService:

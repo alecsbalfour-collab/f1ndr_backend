@@ -1,4 +1,4 @@
-from core.service_core import ServiceCore
+from listr.core.service_core import ServiceCore
 
 class FakeRepo:
     def create(self, data):

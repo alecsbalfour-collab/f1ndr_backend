@@ -27,7 +27,7 @@ class DealrService:
         if not verify_password(password, fake_dealer["password_hash"]):
             return None
 
-        token = create_access_token({"sub": fake_dealer["id"]})
+        token = create_access_token(fake_dealer["id"])
 
         return {
             "dealer_id": fake_dealer["id"],

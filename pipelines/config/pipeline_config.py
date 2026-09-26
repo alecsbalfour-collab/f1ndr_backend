@@ -1,4 +1,4 @@
-# f1ndr-backend/pipelines/config/pipline_config.py
+# f1ndr-backend/pipelines/config/pipeline_config.py
 """
 DICT-aligned pipeline configuration with enterprise features.
 """
