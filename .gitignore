@@ -108,3 +108,4 @@ scraper_cache/
 # Render build cache
 render.yaml
 all_my_code.txt
+*.log
