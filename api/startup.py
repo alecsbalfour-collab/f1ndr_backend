@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from db.connection_db import connect_to_db, get_client, get_database
 from db.document_store import ensure_all_indexes
+from db.migrations import apply_migrations
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,7 @@ async def on_startup(app: FastAPI) -> None:
     from trinn.db.trinn_repo import initialize_task_repo
 
     database = get_database()
+    await apply_migrations(database)
     initialize_task_repo(database)
     await attach_database(get_client(), database)
     await ensure_all_indexes()

@@ -104,6 +104,9 @@ scraper_cache/
 # MongoDB dump files
 *.bson
 *.wt
+backups/
+*.archive.gz
+*.archive.gz.manifest.json
 
 # Render build cache
 render.yaml
