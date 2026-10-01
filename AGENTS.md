@@ -30,6 +30,7 @@
 - Module tests: `.venv/Scripts/python.exe -m pytest -q f1ndr/tests trinn/tests sellr/tests listr/tests dealr/tests`
 - Root tests: `.venv/Scripts/python.exe -m pytest -q tests` (deployment tests need `MONGO_URI` etc.)
 - Everything: `.venv/Scripts/python.exe -m pytest -q` (uses `pytest.ini` testpaths)
+- The Docker image uses the same Python as `.venv` (3.14); keep them in sync, since the suite can't catch syntax the image's Python rejects. After Dockerfile changes, build and `docker run` it, then check `docker ps` shows `(healthy)`. In Git Bash prefix container paths with `MSYS_NO_PATHCONV=1`.
 
 ## Layout gotchas
 - Root `core/`, `config/`, `data/`, `utils/`, `logs/*.py` look like duplicates but are imported by `scheduler/module.py` and `processors/module.py` via bare `from core...` imports. Don't delete; untangle by restructuring.

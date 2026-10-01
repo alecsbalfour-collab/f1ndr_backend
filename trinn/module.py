@@ -18,7 +18,7 @@ class TrinnModule:
     
     def __init__(self):
         self.config = get_trinn_config()
-        logger.info(f"TrinnModule initialized: {self.config["feature_key"]}")
+        logger.info(f"TrinnModule initialized: {self.config['feature_key']}")
     
     async def run(self, action: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """

@@ -1,4 +1,4 @@
-FROM python:3.11-slim AS builder
+FROM python:3.14-slim AS builder
 
 ENV PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
@@ -10,11 +10,12 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 
-FROM python:3.11-slim
+FROM python:3.14-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PATH="/opt/venv/bin:$PATH" \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
     HOST=0.0.0.0 \
     PORT=8000
 
@@ -24,6 +25,9 @@ RUN groupadd --system --gid 10001 app \
 WORKDIR /app
 
 COPY --from=builder /opt/venv /opt/venv
+# Scrapers launch headless Chromium; installs the browser plus its system libraries (needs root).
+RUN playwright install --with-deps --only-shell chromium \
+    && rm -rf /var/lib/apt/lists/*
 COPY . .
 RUN mkdir -p /app/logs && chown -R app:app /app/logs
 
