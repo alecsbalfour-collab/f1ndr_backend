@@ -8,7 +8,7 @@ are the liveness and readiness probes for Docker and load balancers.
 import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -92,13 +92,18 @@ def _scheduler_check() -> Dict[str, Any]:
     return {**state, "ok": state["status"] != "failed"}
 
 
+async def readiness_report() -> Tuple[bool, Dict[str, Dict[str, Any]]]:
+    checks = {"mongo": await _mongo_check(), "scheduler": _scheduler_check()}
+    return all(check["ok"] for check in checks.values()), checks
+
+
 @router.get("/health/ready", response_model=Envelope[Readiness],
             responses={503: {"model": ErrorEnvelope, "description": "A dependency is not ready"}})
 @limiter.exempt
 async def readiness():
     """Ready to take traffic: Mongo reachable (when connected or required) and scheduler workers alive."""
-    checks = {"mongo": await _mongo_check(), "scheduler": _scheduler_check()}
-    if not all(check["ok"] for check in checks.values()):
+    ready, checks = await readiness_report()
+    if not ready:
         return error_response(message="Service not ready", status_code=503, error_code="NOT_READY",
                               details={"checks": checks})
     return ok({"status": "ready", "checks": checks}, "Ready")
