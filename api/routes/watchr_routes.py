@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from typing import Any, Dict, Optional
 from api.dependencies.auth import require_user
 from api.schemas.common import Envelope, ModuleStatus, Page, ok, paged
-from api.schemas.watch_schemas import Alert, Subscription
+from api.schemas.watch_schemas import Alert, AlertOut, Subscription, SubscriptionOut
 
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ async def watchr_status():
     )
 
 
-@router.post("/alerts", status_code=201, response_model=Envelope[Alert])
+@router.post("/alerts", status_code=201, response_model=Envelope[AlertOut])
 async def create_alert(alert_data: Alert, claims: Dict[str, Any] = Depends(require_user)):
     """
     Create alert with enterprise validation and FlutterFlow compatibility.
@@ -57,7 +57,7 @@ async def create_alert(alert_data: Alert, claims: Dict[str, Any] = Depends(requi
     return ok({**alert_data.to_data(), "user_id": claims["sub"]}, "Alert created successfully")
 
 
-@router.get("/alerts", response_model=Page[Alert])
+@router.get("/alerts", response_model=Page[AlertOut])
 async def get_alerts(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -101,7 +101,7 @@ async def delete_alert(alert_id: str, claims: Dict[str, Any] = Depends(require_u
     return ok(message="Alert deleted successfully")
 
 
-@router.post("/subscriptions", status_code=201, response_model=Envelope[Subscription])
+@router.post("/subscriptions", status_code=201, response_model=Envelope[SubscriptionOut])
 async def create_subscription(subscription_data: Subscription, claims: Dict[str, Any] = Depends(require_user)):
     """
     Create subscription with enterprise validation and FlutterFlow compatibility.

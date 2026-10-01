@@ -19,6 +19,9 @@
 - Refresh tokens are persisted by `jti` and rotated on every `/auth/refresh`; replaying a used one revokes the whole session family. Access tokens are checked against a `jti` denylist in `require_user`.
 - Guards in `api/dependencies/auth.py`: `require_user`, `require_scopes(...)` (roles -> scopes map in `api/auth/roles.py`), `require_verified_email`. Role changes apply on the next token refresh.
 - Record security-relevant actions with `api.auth.audit.record_audit(event, request, user_id=..., actor_id=...)`.
+- Auth by default: every `/api/v1` route needs `require_user`/`require_scopes` unless listed in `PUBLIC_ROUTES` in `tests/api/test_route_auth.py` (the test fails otherwise). Public = status/version, account entry points, anonymous browsing. Admin-only (`tasks:admin`) = trinn run/schedule/config, scraper search. Dealer (`inventory:*`) = dealr inventory, listr publishing.
+- Ownership comes from the token, never the body: sellr `user_id`, dealr `owner_id`, watchr `user_id` (listed in the payload model's `server_fields`). Non-owners get 404, admins bypass (`owns()` in `api/dependencies/auth.py`); ownerless legacy documents are admin-only. Payload models with `server_fields` need a separate `Record` output model, since `OpenPayload` strips those fields on output too.
+- Tests get tokens from the `headers_for(role, sub=...)` fixture in `tests/conftest.py`.
 - Auth tests disable the slowapi limiter (`tests/api/test_auth.py`) and capture email by patching `api.routes.auth_routes.send_email`.
 
 ## Commands
@@ -52,11 +55,11 @@ Work one session per group; tick items off here as they land. Keep each group to
 - [ ] `.env` was committed in `0756fc7`/`1de097f`: user rotates any real secrets (history rewrite only if user explicitly asks).
 - [x] Replace unsalted SHA-256 `hash_password` in `api/routes/auth_routes.py` with bcrypt (already in requirements).
 - [x] Move `users_db`/`sessions_db` in-memory dicts to `DocumentStore`, unique index on email.
-- [ ] Stop returning `str(e)` to clients; return generic message + request ID, log details server-side.
-- [ ] Auth by default: only dealr inventory routes use `require_user`; decide public routes, protect the rest at router level.
-- [ ] Register in `api/main.py`: `RequestIDMiddleware`, request timer, error-handler middleware, `apply_secure_headers`, global exception handlers from `api/errors/`.
-- [ ] Attach slowapi `limiter` (`app.state.limiter`, exception handler), strict limits on `/auth/login` and `/auth/register`.
-- [ ] Consolidate the remaining health endpoints to one.
+- [x] Stop returning `str(e)` to clients; return generic message + request ID, log details server-side.
+- [x] Auth by default: only dealr inventory routes use `require_user`; decide public routes, protect the rest at router level.
+- [x] Register in `api/main.py`: `RequestIDMiddleware`, request timer, error-handler middleware, `apply_secure_headers`, global exception handlers from `api/errors/`.
+- [x] Attach slowapi `limiter` (`app.state.limiter`, exception handler), strict limits on `/auth/login` and `/auth/register`.
+- [x] Consolidate the remaining health endpoints to one.
 
 ### Session 2 - Deployment (Tier 2)
 - [ ] `run_backend.py`: host/port/reload/workers from settings (currently hard-coded `127.0.0.1`, `reload=True`, unreachable in Docker).
