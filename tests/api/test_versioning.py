@@ -53,8 +53,8 @@ def test_unknown_paths_are_not_marked_deprecated(client):
 
 def test_openapi_lists_only_versioned_api_and_health(client):
     paths = client.get("/openapi.json").json()["paths"]
-    assert "/api/v1/auth/login" in paths and "/health" in paths
-    assert all(p.startswith("/api/v1/") or p == "/health" for p in paths), sorted(paths)
+    assert "/api/v1/auth/login" in paths and {"/health", "/health/live", "/health/ready"} <= paths.keys()
+    assert all(p.startswith(("/api/v1/", "/health")) for p in paths), sorted(paths)
 
 
 def test_login_rate_limit_is_shared_between_legacy_and_v1(client):

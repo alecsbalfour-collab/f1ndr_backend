@@ -62,11 +62,12 @@ Work one session per group; tick items off here as they land. Keep each group to
 - [x] Consolidate the remaining health endpoints to one.
 
 ### Session 2 - Deployment (Tier 2)
-- [ ] `run_backend.py`: host/port/reload/workers from settings (currently hard-coded `127.0.0.1`, `reload=True`, unreachable in Docker).
-- [ ] `DEBUG` default `False`; fail production startup on weak/missing `JWT_SECRET_KEY`.
-- [ ] Dockerfile: non-root user, `HEALTHCHECK`, multi-stage build.
-- [ ] docker-compose: pin `mongo:7`, move `admin/admin` credentials to env.
-- [ ] Split health into `/health/live` and `/health/ready` (Mongo ping, scheduler state).
+- [x] `run_backend.py`: host/port/reload/workers from settings (currently hard-coded `127.0.0.1`, `reload=True`, unreachable in Docker).
+- [x] `DEBUG` default `False`; fail production startup on weak/missing `JWT_SECRET_KEY`.
+- [x] Dockerfile: non-root user, `HEALTHCHECK`, multi-stage build.
+- [x] docker-compose: pin `mongo:7`, move `admin/admin` credentials to env. (Compose pins `mongo:8.3`; integration tests use `mongo:7`. Align when choosing the production version.)
+- [x] Split health into `/health/live` and `/health/ready` (Mongo ping, scheduler state). Liveness never checks dependencies; readiness returns 503 `NOT_READY`.
+- Note: nothing starts the trinn scheduler (`api/startup.py` never calls `get_scheduler().start()`), so `/trinn/schedule` stores tasks that never run. Intended fix is the ARQ worker (Redis + background work item).
 
 ### Session 3+ - Enterprise features (Tier 3, one session each)
 - [x] Pydantic request/response models instead of `Dict[str, Any]` bodies (`api/schemas/` exists, unused). `/health` still returns untyped data (waiting on the live/ready split).
