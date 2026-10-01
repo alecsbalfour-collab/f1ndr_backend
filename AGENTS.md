@@ -51,6 +51,13 @@
 
 ## Roadmap
 Work one session per group; tick items off here as they land. Keep each group to its own commit(s).
+Priority order of open groups: Before tester release -> Session 3+ (observability first, Sentry helps testers) -> dealr RVs & towables -> Pricing -> Auth expansion (A2-A5 wait on provider accounts).
+
+### Before tester release (next)
+- [ ] Vehicle `category` on inventory, sellr/listr listings and search filters (`car`, `truck`, `motorcycle`, `motorhome_a`, `motorhome_b`, `motorhome_c`, `travel_trailer`, `fifth_wheel`, `toy_hauler`, `truck_camper`, `other`). Must land before testers create data; adding it later needs a data migration. Default existing docs to `car` in a migration.
+- [ ] Replace placeholders testers will hit: watchr alerts/subscriptions persisted per user (list/delete real), f1ndr `/vehicles` and `/listings/*` querying stored listings, market value returns `null` (not `0`) until Pricing lands so clients don't show $0.
+- [ ] Scheduled trinn tasks never run (see Session 2 note): decide on an in-process stopgap (start the scheduler in the lifespan while `WORKERS=1`) or wait for ARQ.
+- [ ] A1 Password reset, pulled forward from Auth expansion: testers will forget passwords.
 
 ### Session 1 - Security fixes + wire existing code (Tier 0 + 1)
 - [ ] `.env` was committed in `0756fc7`/`1de097f`: user rotates any real secrets (history rewrite only if user explicitly asks).
@@ -83,6 +90,17 @@ Work one session per group; tick items off here as they land. Keep each group to
 - [ ] Data layer: versioned index management, backups with tested restore, TTL indexes (check `db/ttl_db.py` usage).
 - [ ] CI: ruff, mypy, pip-audit/bandit, coverage threshold, image build, pinned deps / lock file (`pyproject.toml` deps empty).
 - [ ] Resilience: timeouts on all outbound calls, graceful shutdown draining scraper jobs.
+
+### dealr: RVs & towables (needs `category` from Before tester release)
+- [ ] R1 Category-specific typed fields, validated per category (discriminated on `category`): length, dry weight, GVWR, sleeps, slide-outs, hitch type, fresh/grey/black tank sizes; mileage, engine and chassis only for motorized units. Towables may have short/odd VINs (already allowed by `LooseVIN`). VIN decode gives the type/chassis only; floorplan details are entered manually.
+- [ ] R2 Search/filter by category and RV attributes (f1ndr search, sellr listings, dealr inventory); regenerate the FlutterFlow client.
+- [ ] R3 Marketplace categories in listr and scrapers (Kijiji/Facebook/AutoTrader RV sections; add RVTrader as a platform).
+
+### Pricing (after R1: comps must match within a category)
+- [ ] P1 One pricing provider interface in `f1ndr/intelligence/market.py` replacing both `compute_market_value` stubs (`f1ndr/intelligence/market.py` returns 0.0; `f1ndr/utils/utils.py` only discounts the listing's own price). dealr ingest and sellr auto-pricing use it.
+- [ ] P2 Local market comps: persist scraped listings with location + category, add a location to dealer accounts, match year/make/model/trim within a mileage band and radius; return median, p25/p75, comp count, confidence. Asking prices, not sold prices; check marketplace terms before commercial use.
+- [ ] P3 Book values behind config flags: Canadian Black Book for cars/trucks (confirm whether its specialty valuations cover RVs) and an RV guide (e.g. J.D. Power) for RVs. Needs commercial agreements (`docs/ACCOUNTS_SETUP.md`).
+- [ ] P4 dealr pricing panel endpoint: book values + local comps + suggested price range.
 
 ### Auth expansion - social login + MFA (decided: FastAPI owns auth, not Firebase; one session each, in order)
 Decisions: provider sign-in is trusted (no extra MFA after social login). SMS via Twilio (prefer Twilio Verify). Clients: FlutterFlow app ("Custom Authentication", social buttons as custom actions, app stores the rotated refresh token), f1ndr.ca and dealrlink.com web apps.

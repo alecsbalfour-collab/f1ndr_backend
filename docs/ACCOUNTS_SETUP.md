@@ -35,7 +35,8 @@ environment/secret settings only, never in chat or git. Tick items off as they a
 
 ## Optional / later
 
-- [ ] **Canadian Black Book**: commercial agreement for book-value pricing in dealr.
+- [ ] **Canadian Black Book**: commercial agreement for book-value pricing in dealr (roadmap P3). Ask whether its specialty valuations cover RVs.
+- [ ] **RV valuation guide** (e.g. J.D. Power RV values): needed for RV/towable pricing if CBB doesn't cover them (roadmap P3).
 - [ ] **Sentry**: error reporting for testers' crashes.
 
 ## Suggested order
