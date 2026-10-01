@@ -48,7 +48,7 @@ class WatchController:
         except Exception as e:
             logger.error(f"Watch search failed: {e}")
             return error_response(
-                message=f"Search failed: {str(e)}",
+                message="Search failed",
                 status_code=500,
                 error_code="WATCH_SEARCH_ERROR"
             )
@@ -78,7 +78,7 @@ class WatchController:
         except Exception as e:
             logger.error(f"Create watch item failed: {e}")
             return error_response(
-                message=f"Failed to create watch item: {str(e)}",
+                message="Failed to create watch item",
                 status_code=500,
                 error_code="CREATE_WATCH_ERROR"
             )
@@ -102,7 +102,7 @@ class WatchController:
         except Exception as e:
             logger.error(f"Get watch item failed: {e}")
             return error_response(
-                message=f"Failed to get watch item: {str(e)}",
+                message="Failed to get watch item",
                 status_code=500,
                 error_code="GET_WATCH_ERROR"
             )
@@ -130,7 +130,7 @@ class WatchController:
         except Exception as e:
             logger.error(f"Update watch item failed: {e}")
             return error_response(
-                message=f"Failed to update watch item: {str(e)}",
+                message="Failed to update watch item",
                 status_code=500,
                 error_code="UPDATE_WATCH_ERROR"
             )
@@ -156,7 +156,7 @@ class WatchController:
         except Exception as e:
             logger.error(f"Delete watch item failed: {e}")
             return error_response(
-                message=f"Failed to delete watch item: {str(e)}",
+                message="Failed to delete watch item",
                 status_code=500,
                 error_code="DELETE_WATCH_ERROR"
             )

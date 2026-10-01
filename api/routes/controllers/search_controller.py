@@ -63,7 +63,7 @@ class SearchController:
         except Exception as e:
             logger.error(f"Search failed: {e}")
             return error_response(
-                message=f"Search failed: {str(e)}",
+                message="Search failed",
                 status_code=500,
                 error_code="SEARCH_ERROR"
             )
@@ -107,7 +107,7 @@ class SearchController:
         except Exception as e:
             logger.error(f"Advanced search failed: {e}")
             return error_response(
-                message=f"Advanced search failed: {str(e)}",
+                message="Advanced search failed",
                 status_code=500,
                 error_code="ADVANCED_SEARCH_ERROR"
             )
@@ -137,7 +137,7 @@ class SearchController:
         except Exception as e:
             logger.error(f"Get search suggestions failed: {e}")
             return error_response(
-                message=f"Failed to get suggestions: {str(e)}",
+                message="Failed to get suggestions",
                 status_code=500,
                 error_code="SUGGESTIONS_ERROR"
             )

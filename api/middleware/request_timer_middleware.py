@@ -12,12 +12,19 @@ class RequestTimerMiddleware(BaseHTTPMiddleware):
     """
 
     async def dispatch(self, request: Request, call_next):
-        start = time.time()
+        start = time.perf_counter()
 
         response = await call_next(request)
 
-        duration_ms = round((time.time() - start) * 1000, 2)
-        logger.info(f"{request.method} {request.url.path} took {duration_ms}ms")
+        duration_ms = round((time.perf_counter() - start) * 1000, 2)
+        logger.info(
+            "%s %s -> %s in %sms (request_id=%s)",
+            request.method,
+            request.url.path,
+            response.status_code,
+            duration_ms,
+            getattr(request.state, "request_id", None),
+        )
 
         response.headers["X-Process-Time-ms"] = str(duration_ms)
 

@@ -7,14 +7,16 @@ This API is designed to be fully compatible with FlutterFlow while maintaining D
 ## Base URL
 
 ```
-http://localhost:8000/api
+http://localhost:8000/api/v1
 ```
+
+Health probes (`/health`) are unversioned. The old unversioned paths (e.g. `/auth/login`) still work but are deprecated: they are omitted from `/openapi.json` and their responses carry `Deprecation` and `Link: </api/v1/...>; rel="successor-version"` headers. Breaking changes will ship as `/api/v2` alongside v1.
 
 ## Authentication
 
 ### User Registration
 ```http
-POST /api/auth/register
+POST /api/v1/auth/register
 Content-Type: application/json
 
 {
@@ -26,7 +28,7 @@ Content-Type: application/json
 
 ### User Login
 ```http
-POST /api/auth/login
+POST /api/v1/auth/login
 Content-Type: application/json
 
 {
@@ -37,7 +39,7 @@ Content-Type: application/json
 
 ### Token Refresh
 ```http
-POST /api/auth/refresh
+POST /api/v1/auth/refresh
 Content-Type: application/json
 
 {
@@ -47,13 +49,13 @@ Content-Type: application/json
 
 ### Get Current User
 ```http
-GET /api/auth/me
+GET /api/v1/auth/me
 Authorization: Bearer <access_token>
 ```
 
 ### FlutterFlow Webhook
 ```http
-POST /api/auth/flutterflow/webhook
+POST /api/v1/auth/flutterflow/webhook
 Content-Type: application/json
 
 {
@@ -103,55 +105,54 @@ All endpoints return FlutterFlow-compatible JSON responses:
 
 ### TRINN (Task Orchestration)
 ```http
-GET /api/trinn/status
-POST /api/trinn/run
-POST /api/trinn/schedule
-GET /api/trinn/config
-GET /api/trinn/health
+GET /api/v1/trinn/status
+POST /api/v1/trinn/run
+POST /api/v1/trinn/schedule
+GET /api/v1/trinn/config
 ```
 
 ### DEALR (Dealer Management)
 ```http
-GET /api/dealr/status
-POST /api/dealr/inventory
-GET /api/dealr/inventory?page=1&page_size=20
-PUT /api/dealr/inventory/{id}
-DELETE /api/dealr/inventory/{id}
+GET /api/v1/dealr/status
+POST /api/v1/dealr/inventory
+GET /api/v1/dealr/inventory?page=1&page_size=20
+PUT /api/v1/dealr/inventory/{id}
+DELETE /api/v1/dealr/inventory/{id}
 ```
 
 ### SELLR (Listing Management)
 ```http
-GET /api/sellr/status
-POST /api/sellr/listings
-GET /api/sellr/listings?page=1&page_size=20&user_id={id}
-GET /api/sellr/listings/{id}
-PUT /api/sellr/listings/{id}
-DELETE /api/sellr/listings/{id}
+GET /api/v1/sellr/status
+POST /api/v1/sellr/listings
+GET /api/v1/sellr/listings?page=1&page_size=20&user_id={id}
+GET /api/v1/sellr/listings/{id}
+PUT /api/v1/sellr/listings/{id}
+DELETE /api/v1/sellr/listings/{id}
 ```
 
 ### LISTR (Platform Integration)
 ```http
-GET /api/listr/status
-POST /api/listr/listings?platform=facebook
-PUT /api/listr/listings/{id}?platform=facebook
-GET /api/listr/platforms
+GET /api/v1/listr/status
+POST /api/v1/listr/listings?platform=facebook
+PUT /api/v1/listr/listings/{id}?platform=facebook
+GET /api/v1/listr/platforms
 ```
 
 ### WATCHR (Alert System)
 ```http
-GET /api/watchr/status
-POST /api/watchr/alerts
-GET /api/watchr/alerts?page=1&page_size=20
-DELETE /api/watchr/alerts/{id}
-POST /api/watchr/subscriptions
+GET /api/v1/watchr/status
+POST /api/v1/watchr/alerts
+GET /api/v1/watchr/alerts?page=1&page_size=20
+DELETE /api/v1/watchr/alerts/{id}
+POST /api/v1/watchr/subscriptions
 ```
 
 ### F1NDR (Core Intelligence)
 ```http
-GET /api/f1ndr/status
-POST /api/f1ndr/vin/decode
-GET /api/f1ndr/vehicles?page=1&page_size=20
-GET /api/f1ndr/market/value?vin={vin}
+GET /api/v1/f1ndr/status
+POST /api/v1/f1ndr/vin/decode
+GET /api/v1/f1ndr/vehicles?page=1&page_size=20
+GET /api/v1/f1ndr/market/value?vin={vin}
 ```
 
 ## Pagination
@@ -159,7 +160,7 @@ GET /api/f1ndr/market/value?vin={vin}
 All list endpoints support FlutterFlow-compatible pagination:
 
 ```http
-GET /api/endpoint?page=1&page_size=20&sort_by=created_at&sort_order=desc
+GET /api/v1/endpoint?page=1&page_size=20&sort_by=created_at&sort_order=desc
 ```
 
 ### Query Parameters
@@ -173,7 +174,7 @@ GET /api/endpoint?page=1&page_size=20&sort_by=created_at&sort_order=desc
 Endpoints support filtering via query parameters:
 
 ```http
-GET /api/endpoint?status=active&category=vehicles&min_price=1000&max_price=50000
+GET /api/v1/endpoint?status=active&category=vehicles&min_price=1000&max_price=50000
 ```
 
 ## FlutterFlow Integration
@@ -223,7 +224,7 @@ All responses use FlutterFlow-compatible data types:
 
 ### FlutterFlow Webhook
 ```http
-POST /api/auth/flutterflow/webhook
+POST /api/v1/auth/flutterflow/webhook
 ```
 
 Supported events:
@@ -265,12 +266,12 @@ GET /version
 
 ### Module Status
 ```http
-GET /api/trinn/status
-GET /api/dealr/status
-GET /api/sellr/status
-GET /api/listr/status
-GET /api/watchr/status
-GET /api/f1ndr/status
+GET /api/v1/trinn/status
+GET /api/v1/dealr/status
+GET /api/v1/sellr/status
+GET /api/v1/listr/status
+GET /api/v1/watchr/status
+GET /api/v1/f1ndr/status
 ```
 
 ## Support

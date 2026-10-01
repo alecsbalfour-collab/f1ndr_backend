@@ -5,7 +5,7 @@ DICT-aligned version controller with FlutterFlow compatibility and enterprise fe
 
 import logging
 from fastapi import APIRouter
-from utils.response_builder import success_response
+from api.schemas.common import Envelope, VersionInfo, ok
 
 
 logger = logging.getLogger(__name__)
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/version", tags=["version"])
 
 
-@router.get("/")
+@router.get("/", response_model=Envelope[VersionInfo])
 async def version_info():
     """
     Version information endpoint with FlutterFlow-compatible response.
@@ -21,28 +21,18 @@ async def version_info():
     Returns:
         FlutterFlow-compatible version information
     """
-    try:
-        return success_response(
-            data={
-                "version": "1.0.0",
-                "description": "F1NDR Backend API",
-                "status": "stable",
-                "api_type": "REST",
-                "flutterflow_compatible": True,
-                "enterprise_features": True,
-                "timestamp": _get_timestamp(),
-            },
-            message="Version information retrieved"
-        )
-        
-    except Exception as e:
-        logger.error(f"Version info failed: {e}")
-        return {
-            "version": "unknown",
-            "status": "error",
-            "message": str(e),
+    return ok(
+        {
+            "version": "1.0.0",
+            "description": "F1NDR Backend API",
+            "status": "stable",
+            "api_type": "REST",
+            "flutterflow_compatible": True,
+            "enterprise_features": True,
             "timestamp": _get_timestamp(),
-        }
+        },
+        "Version information retrieved",
+    )
 
 
 def _get_timestamp():

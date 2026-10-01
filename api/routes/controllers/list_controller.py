@@ -6,6 +6,8 @@ DICT-aligned list controller with FlutterFlow compatibility and enterprise featu
 import logging
 from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, Query
+from api.schemas.common import Page, paged
+from api.schemas.list_schemas import VehicleOut
 from utils.response_builder import success_response, error_response, paginated_response
 
 
@@ -15,7 +17,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/listings", tags=["listings"])
 
 
-@router.get("/unified")
+@router.get("/unified", response_model=Page[VehicleOut])
 async def get_unified_listings(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -38,118 +40,58 @@ async def get_unified_listings(
     Returns:
         FlutterFlow-compatible paginated response
     """
-    try:
-        logger.info(f"Getting unified listings - page: {page}, filters: {search}, {category}")
-        
-        # TODO: Implement actual database query with filters
-        results = []
-        total = 0
-        
-        return paginated_response(
-            data=results,
-            total=total,
-            page=page,
-            page_size=page_size,
-            message="Unified listings retrieved"
-        )
-        
-    except Exception as e:
-        logger.error(f"Get unified listings failed: {e}")
-        return error_response(
-            message=f"Failed to get unified listings: {str(e)}",
-            status_code=500,
-            error_code="GET_UNIFIED_LISTINGS_ERROR"
-        )
+    logger.info(f"Getting unified listings - page: {page}, filters: {search}, {category}")
+    
+    # TODO: Implement actual database query with filters
+    results = []
+    total = 0
+    
+    return paged(results, total, page, page_size, "Unified listings retrieved")
 
 
-@router.get("/raw/facebook")
+@router.get("/raw/facebook", response_model=Page[VehicleOut])
 async def get_raw_facebook_listings(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100)
 ):
     """Get raw Facebook listings with FlutterFlow-compatible pagination."""
-    try:
-        logger.info(f"Getting raw Facebook listings - page: {page}")
-        
-        # TODO: Implement actual Facebook data retrieval
-        results = []
-        total = 0
-        
-        return paginated_response(
-            data=results,
-            total=total,
-            page=page,
-            page_size=page_size,
-            message="Facebook listings retrieved"
-        )
-        
-    except Exception as e:
-        logger.error(f"Get Facebook listings failed: {e}")
-        return error_response(
-            message=f"Failed to get Facebook listings: {str(e)}",
-            status_code=500,
-            error_code="GET_FACEBOOK_LISTINGS_ERROR"
-        )
+    logger.info(f"Getting raw Facebook listings - page: {page}")
+    
+    # TODO: Implement actual Facebook data retrieval
+    results = []
+    total = 0
+    
+    return paged(results, total, page, page_size, "Facebook listings retrieved")
 
 
-@router.get("/raw/kijiji")
+@router.get("/raw/kijiji", response_model=Page[VehicleOut])
 async def get_raw_kijiji_listings(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100)
 ):
     """Get raw Kijiji listings with FlutterFlow-compatible pagination."""
-    try:
-        logger.info(f"Getting raw Kijiji listings - page: {page}")
-        
-        # TODO: Implement actual Kijiji data retrieval
-        results = []
-        total = 0
-        
-        return paginated_response(
-            data=results,
-            total=total,
-            page=page,
-            page_size=page_size,
-            message="Kijiji listings retrieved"
-        )
-        
-    except Exception as e:
-        logger.error(f"Get Kijiji listings failed: {e}")
-        return error_response(
-            message=f"Failed to get Kijiji listings: {str(e)}",
-            status_code=500,
-            error_code="GET_KIJIJI_LISTINGS_ERROR"
-        )
+    logger.info(f"Getting raw Kijiji listings - page: {page}")
+    
+    # TODO: Implement actual Kijiji data retrieval
+    results = []
+    total = 0
+    
+    return paged(results, total, page, page_size, "Kijiji listings retrieved")
 
 
-@router.get("/raw/craigslist")
+@router.get("/raw/craigslist", response_model=Page[VehicleOut])
 async def get_raw_craigslist_listings(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100)
 ):
     """Get raw Craigslist listings with FlutterFlow-compatible pagination."""
-    try:
-        logger.info(f"Getting raw Craigslist listings - page: {page}")
-        
-        # TODO: Implement actual Craigslist data retrieval
-        results = []
-        total = 0
-        
-        return paginated_response(
-            data=results,
-            total=total,
-            page=page,
-            page_size=page_size,
-            message="Craigslist listings retrieved"
-        )
-        
-    except Exception as e:
-        logger.error(f"Get Craigslist listings failed: {e}")
-        return error_response(
-            message=f"Failed to get Craigslist listings: {str(e)}",
-            status_code=500,
-            error_code="GET_CRAIGSLIST_LISTINGS_ERROR"
-        )
+    logger.info(f"Getting raw Craigslist listings - page: {page}")
+    
+    # TODO: Implement actual Craigslist data retrieval
+    results = []
+    total = 0
+    
+    return paged(results, total, page, page_size, "Craigslist listings retrieved")
 
 
 class ListController:
@@ -188,7 +130,7 @@ class ListController:
         except Exception as e:
             logger.error(f"Listing search failed: {e}")
             return error_response(
-                message=f"Search failed: {str(e)}",
+                message="Search failed",
                 status_code=500,
                 error_code="LISTING_SEARCH_ERROR"
             )

@@ -2,7 +2,7 @@
 
 import time
 from fastapi import Request
-from f1ndr_backend.api.errors.error_handler import raise_api_error
+from api.errors import raise_api_error
 
 # In‑memory abuse tracking (per‑IP request timestamps)
 ABUSE_CACHE: dict[str, list[float]] = {}

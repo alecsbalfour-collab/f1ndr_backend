@@ -92,6 +92,9 @@ log/
 *.temp
 *.swp
 *.swo
+# Office lock/temp files (~$name.docx, ~WRD0419.tmp)
+~$*
+~WRD*
 
 # ============================
 # f1ndr PROJECT SPECIFIC
@@ -111,4 +114,4 @@ backups/
 # Render build cache
 render.yaml
 all_my_code.txt
-*.log
+*-combined.txt

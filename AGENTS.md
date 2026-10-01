@@ -13,8 +13,78 @@
 - `TestClient(app)` without `with` skips the lifespan, so tests stay in-memory. Mongo integration tests only run when `MONGODB_URI` is set in the process env (never read from `.env`, which points at real data).
 - Local throwaway Mongo for integration tests: `docker run -d --rm --name f1ndr-test-mongo -p 27099:27017 mongo:7`, then run pytest with `MONGODB_URI=mongodb://127.0.0.1:27099`. Ports 27017/27018 are the user's own containers.
 
+## Auth
+- Services live in `api/auth/` (`accounts`, `tokens`, `roles`, `audit`, `email`, `store`); `api/routes/auth_routes.py` is thin HTTP glue. `api/auth` must not import `api.routes`.
+- JWTs are signed with `get_settings().JWT_SECRET_KEY` (not `auth_config.secret_key`, which only reads process env).
+- Refresh tokens are persisted by `jti` and rotated on every `/auth/refresh`; replaying a used one revokes the whole session family. Access tokens are checked against a `jti` denylist in `require_user`.
+- Guards in `api/dependencies/auth.py`: `require_user`, `require_scopes(...)` (roles -> scopes map in `api/auth/roles.py`), `require_verified_email`. Role changes apply on the next token refresh.
+- Record security-relevant actions with `api.auth.audit.record_audit(event, request, user_id=..., actor_id=...)`.
+- Auth tests disable the slowapi limiter (`tests/api/test_auth.py`) and capture email by patching `api.routes.auth_routes.send_email`.
+
 ## Commands
 - Python: `.venv/Scripts/python.exe`
 - Run API: `.venv/Scripts/python.exe run_backend.py` (app lives in `api/main.py`; routers mounted in `api/router_api.py`)
 - Module tests: `.venv/Scripts/python.exe -m pytest -q f1ndr/tests trinn/tests sellr/tests listr/tests dealr/tests`
 - Root tests: `.venv/Scripts/python.exe -m pytest -q tests` (deployment tests need `MONGO_URI` etc.)
+- Everything: `.venv/Scripts/python.exe -m pytest -q` (uses `pytest.ini` testpaths)
+
+## Layout gotchas
+- Root `core/`, `config/`, `data/`, `utils/`, `logs/*.py` look like duplicates but are imported by `scheduler/module.py` and `processors/module.py` via bare `from core...` imports. Don't delete; untangle by restructuring.
+- Root `module.py` and `api_router.py` are entrypoints checked by `tests/api/test_module_links.py`.
+- Route controllers live in `api/routes/controllers/`.
+
+## API models
+- Request/response models live in `api/schemas/` (`common.py` has the shared pieces). No `Dict[str, Any]` bodies.
+- Success paths `return ok(data, message)` / `paged(...)` with `response_model=Envelope[X]` / `Page[X]` so FastAPI validates and documents them; error paths return `utils/response_builder.error_response` (a JSONResponse, which bypasses the response model) and are documented with `responses=error_responses(...)`.
+- Open-ended documents (listings, inventory, alerts) subclass `OpenPayload`: declared fields validated, unknown keys pass through, `id`/`_id`/`created_at`/`updated_at` dropped, `$`/dotted keys rejected. Pass `model.to_data()` (exclude_unset) to modules. Output models subclass `Record` and carry no constraints so legacy documents still load.
+- Operation IDs are `<tag>_<function name>` (used by generated FlutterFlow clients); keep function names stable. `tests/api/test_schemas.py` fails if any body or 2xx response is untyped.
+
+## Versioning
+- `api_router` (`api/router_api.py`) is mounted at `API_V1_PREFIX` (`/api/v1`) in `api/main.py`; health is mounted at the root only. Add new routers to `api_router`, never to `app` directly. Tests call `/api/v1/...`.
+- The same router is also mounted unversioned with `include_in_schema=False` as deprecated aliases; `DeprecationMiddleware` adds `Deprecation`/`Link` headers and logs each legacy route once. Drop that `include_router` line in `api/main.py` when the logs show no legacy traffic.
+- Breaking changes go in a new `/api/v2` router mounted alongside v1; don't change v1 contracts in place.
+- slowapi uses `key_style="endpoint"` so limits are per view function; keep it, otherwise the aliases double the login/register quotas.
+
+## Roadmap
+Work one session per group; tick items off here as they land. Keep each group to its own commit(s).
+
+### Session 1 - Security fixes + wire existing code (Tier 0 + 1)
+- [ ] `.env` was committed in `0756fc7`/`1de097f`: user rotates any real secrets (history rewrite only if user explicitly asks).
+- [x] Replace unsalted SHA-256 `hash_password` in `api/routes/auth_routes.py` with bcrypt (already in requirements).
+- [x] Move `users_db`/`sessions_db` in-memory dicts to `DocumentStore`, unique index on email.
+- [ ] Stop returning `str(e)` to clients; return generic message + request ID, log details server-side.
+- [ ] Auth by default: only dealr inventory routes use `require_user`; decide public routes, protect the rest at router level.
+- [ ] Register in `api/main.py`: `RequestIDMiddleware`, request timer, error-handler middleware, `apply_secure_headers`, global exception handlers from `api/errors/`.
+- [ ] Attach slowapi `limiter` (`app.state.limiter`, exception handler), strict limits on `/auth/login` and `/auth/register`.
+- [ ] Consolidate the remaining health endpoints to one.
+
+### Session 2 - Deployment (Tier 2)
+- [ ] `run_backend.py`: host/port/reload/workers from settings (currently hard-coded `127.0.0.1`, `reload=True`, unreachable in Docker).
+- [ ] `DEBUG` default `False`; fail production startup on weak/missing `JWT_SECRET_KEY`.
+- [ ] Dockerfile: non-root user, `HEALTHCHECK`, multi-stage build.
+- [ ] docker-compose: pin `mongo:7`, move `admin/admin` credentials to env.
+- [ ] Split health into `/health/live` and `/health/ready` (Mongo ping, scheduler state).
+
+### Session 3+ - Enterprise features (Tier 3, one session each)
+- [x] Pydantic request/response models instead of `Dict[str, Any]` bodies (`api/schemas/` exists, unused). `/health` still returns untyped data (waiting on the live/ready split).
+- [x] API versioning under `/api/v1`. Legacy unversioned aliases still mounted (deprecated); remove once unused.
+- [ ] Observability: structured JSON logs with request ID, Prometheus metrics, OpenTelemetry tracing, Sentry.
+- [x] Auth maturity: refresh-token revocation via `jti`, roles/scopes, account lockout, email verification, audit log.
+- [ ] Redis + background work (one session, decided: ARQ on Redis, no leader lock). Scrapers and the scheduler currently run inside the API process, so with multiple workers or replicas scheduled jobs run twice and in-memory slowapi limits don't hold. One Redis instance covers all of it:
+  - ARQ worker as a separate process/compose service; `trinn/utils/scheduler.py` loop and scraper jobs become ARQ functions + `cron_jobs`. API only enqueues. ARQ is asyncio-native, so it fits the async `run()` contract (Celery doesn't).
+  - slowapi `Limiter(storage_uri=settings.REDIS_URL)`; fall back to `memory://` when `REDIS_URL` is unset (tests, dev), same pattern as `DocumentStore`.
+  - Scraper result cache in Redis with TTLs.
+  - `/health/ready` also pings Redis; production fails startup if Redis is unreachable.
+- [ ] Data layer: versioned index management, backups with tested restore, TTL indexes (check `db/ttl_db.py` usage).
+- [ ] CI: ruff, mypy, pip-audit/bandit, coverage threshold, image build, pinned deps / lock file (`pyproject.toml` deps empty).
+- [ ] Resilience: timeouts on all outbound calls, graceful shutdown draining scraper jobs.
+
+### Auth expansion - social login + MFA (decided: FastAPI owns auth, not Firebase; one session each, in order)
+Decisions: provider sign-in is trusted (no extra MFA after social login). SMS via Twilio (prefer Twilio Verify). Clients: FlutterFlow app ("Custom Authentication", social buttons as custom actions, app stores the rotated refresh token), f1ndr.ca and dealrlink.com web apps.
+Per product (dealr proposed, confirm with user): f1ndr = email/password + Google, Apple, Microsoft, Facebook. dealr (business) = email/password + Google + Microsoft, MFA required for `dealer`/`admin` roles; per-dealership SSO later if asked.
+Provider accounts are owned by admin@triverdant.ca; secrets go in env/secret manager, never in chat or git.
+- [ ] A1 Password reset: emailed single-use token, revokes all sessions, must not bypass MFA once it exists.
+- [ ] A2 Google + Apple + Microsoft: `auth_identities` collection (unique `provider`+`subject`), mobile posts provider ID token to `/auth/oauth/{provider}`, web uses authorization-code + PKCE redirect; verify via provider JWKS (`httpx`). Auto-link by email only when provider marks it verified (never for Microsoft; key on `tid`+`oid`). Apple: name only on first sign-in, private relay email, token revocation on account deletion.
+- [ ] A3 MFA core: login returns `mfa_required` + short-lived `mfa_pending` token; TOTP (secret encrypted at rest, new key setting) + 10 hashed single-use recovery codes; per-token and per-user attempt limits; fresh login required to change MFA.
+- [ ] A4 Email OTP as an MFA method (weak while reset goes to the same inbox; not allowed as the only factor for dealr).
+- [ ] A5 Facebook (Graph `debug_token`; iOS Limited Login gives an OIDC token) + Twilio SMS OTP (country allowlist CA/US, Fraud Guard, never the only factor).

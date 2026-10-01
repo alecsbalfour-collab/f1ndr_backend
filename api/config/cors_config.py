@@ -29,6 +29,10 @@ def apply_cors(app: FastAPI) -> None:
         "https://flutterflow.io",
         "https://app.flutterflow.io",
         "https://*.flutterflow.app",  # Custom FlutterFlow apps
+        "https://dealrlink.com",  # dealr web app
+        "https://*.dealrlink.com",
+        "https://f1ndr.ca",  # f1ndr web app
+        "https://*.f1ndr.ca",
         "http://localhost:*",  # Development
         "http://127.0.0.1:*",  # Development
     ]
@@ -80,6 +84,8 @@ def apply_cors(app: FastAPI) -> None:
             "X-Total-Count",
             "X-Page-Count",
             "X-Request-ID",
+            "Deprecation",
+            "Link",
         ],
         max_age=86400,  # 24 hours cache for preflight requests
     )

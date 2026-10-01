@@ -308,6 +308,20 @@ def get_scheduler() -> TrinnScheduler:
     return _scheduler
 
 
+def get_scheduler_state() -> Dict[str, Any]:
+    """Scheduler status for readiness checks, without creating the scheduler."""
+    if _scheduler is None:
+        return {"status": "not_started"}
+    if not _scheduler.running:
+        return {"status": "stopped", **_scheduler.get_metrics()}
+    dead = sum(1 for task in _scheduler.worker_tasks if task.done())
+    return {
+        "status": "failed" if dead else "running",
+        "dead_tasks": dead,
+        **_scheduler.get_metrics(),
+    }
+
+
 # Legacy function for backward compatibility
 def schedule_interval(task: Dict[str, Any], hours: int) -> bool:
     """Legacy function to schedule task (deprecated, use TrinnScheduler directly)."""

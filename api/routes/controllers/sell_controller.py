@@ -42,7 +42,7 @@ class SellController:
         except Exception as e:
             logger.error(f"Create listing failed: {e}")
             return error_response(
-                message=f"Failed to create listing: {str(e)}",
+                message="Failed to create listing",
                 status_code=500,
                 error_code="CREATE_LISTING_ERROR"
             )
@@ -66,7 +66,7 @@ class SellController:
         except Exception as e:
             logger.error(f"Get listing failed: {e}")
             return error_response(
-                message=f"Failed to get listing: {str(e)}",
+                message="Failed to get listing",
                 status_code=500,
                 error_code="GET_LISTING_ERROR"
             )
@@ -94,7 +94,7 @@ class SellController:
         except Exception as e:
             logger.error(f"Update listing failed: {e}")
             return error_response(
-                message=f"Failed to update listing: {str(e)}",
+                message="Failed to update listing",
                 status_code=500,
                 error_code="UPDATE_LISTING_ERROR"
             )
@@ -120,7 +120,7 @@ class SellController:
         except Exception as e:
             logger.error(f"Delete listing failed: {e}")
             return error_response(
-                message=f"Failed to delete listing: {str(e)}",
+                message="Failed to delete listing",
                 status_code=500,
                 error_code="DELETE_LISTING_ERROR"
             )
@@ -159,7 +159,7 @@ class SellController:
         except Exception as e:
             logger.error(f"Get user listings failed: {e}")
             return error_response(
-                message=f"Failed to get user listings: {str(e)}",
+                message="Failed to get user listings",
                 status_code=500,
                 error_code="GET_USER_LISTINGS_ERROR"
             )

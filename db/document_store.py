@@ -10,7 +10,7 @@ from copy import deepcopy
 from threading import RLock
 from typing import Any, Dict, List, Optional, Tuple
 
-from pymongo import ASCENDING
+from pymongo import ASCENDING, ReturnDocument
 
 from db.connection_db import get_database
 
@@ -18,10 +18,20 @@ _STORES: List["DocumentStore"] = []
 
 
 class DocumentStore:
-    def __init__(self, collection: str, key: str = "id", indexes: Tuple[str, ...] = ()):
+    def __init__(
+        self,
+        collection: str,
+        key: str = "id",
+        indexes: Tuple[str, ...] = (),
+        unique: Tuple[str, ...] = (),
+        ttl_field: Optional[str] = None,
+    ):
+        """`ttl_field` must hold a naive-UTC datetime; Mongo deletes the doc once it passes."""
         self.collection_name = collection
         self.key = key
         self.indexes = indexes
+        self.unique = unique
+        self.ttl_field = ttl_field
         self._memory: Dict[Any, dict] = {}
         self._lock = RLock()
         _STORES.append(self)
@@ -58,6 +68,32 @@ class DocumentStore:
             existed = key in self._memory
             self._memory[key] = deepcopy(self._clean(doc))
             return existed
+
+    async def update(self, key: Any, fields: dict) -> bool:
+        """Set the given fields on an existing document. Returns True if it existed."""
+        col = self._collection
+        if col is not None:
+            return (await col.update_one({self.key: key}, {"$set": fields})).matched_count > 0
+        with self._lock:
+            if key not in self._memory:
+                return False
+            self._memory[key].update(deepcopy(fields))
+            return True
+
+    async def increment(self, key: Any, field: str, amount: int = 1) -> Optional[int]:
+        """Atomically add to a numeric field; returns the new value, or None if the doc is missing."""
+        col = self._collection
+        if col is not None:
+            doc = await col.find_one_and_update(
+                {self.key: key}, {"$inc": {field: amount}}, return_document=ReturnDocument.AFTER
+            )
+            return None if doc is None else doc[field]
+        with self._lock:
+            doc = self._memory.get(key)
+            if doc is None:
+                return None
+            doc[field] = doc.get(field, 0) + amount
+            return doc[field]
 
     async def delete(self, key: Any) -> bool:
         col = self._collection
@@ -101,6 +137,12 @@ class DocumentStore:
         await col.create_index([(self.key, ASCENDING)], unique=True, name=f"{self.collection_name}_{self.key}_unique")
         for field in self.indexes:
             await col.create_index([(field, ASCENDING)], name=f"{self.collection_name}_{field}")
+        for field in self.unique:
+            await col.create_index([(field, ASCENDING)], unique=True, name=f"{self.collection_name}_{field}_unique")
+        if self.ttl_field:
+            await col.create_index(
+                [(self.ttl_field, ASCENDING)], expireAfterSeconds=0, name=f"{self.collection_name}_{self.ttl_field}_ttl"
+            )
 
     def clear_memory(self) -> None:
         with self._lock:

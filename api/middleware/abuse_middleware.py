@@ -1,7 +1,7 @@
 # f1ndr_backend/api/middleware/abuse_middleware.py
 
 from starlette.middleware.base import BaseHTTPMiddleware
-from f1ndr_backend.api.security.abuse_protection import abuse_guard
+from api.security.abuse_protection import abuse_guard
 
 
 class AbuseMiddleware(BaseHTTPMiddleware):

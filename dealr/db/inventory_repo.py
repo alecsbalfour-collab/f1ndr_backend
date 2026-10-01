@@ -8,7 +8,7 @@ from typing import Optional
 
 from db.document_store import DocumentStore
 
-inventory_store = DocumentStore("dealr_inventory", key="id", indexes=("status", "vin"))
+inventory_store = DocumentStore("dealr_inventory", key="id", indexes=("status", "vin", "owner_id"))
 
 
 async def save_inventory(inv: dict) -> str:
@@ -28,8 +28,14 @@ async def update_inventory_db(inv: dict) -> bool:
     return await inventory_store.upsert(merged)
 
 
-async def list_inventory(status: Optional[str] = None, page: int = 1, page_size: int = 20) -> dict:
-    query = {"status": status} if status else {}
+async def get_inventory(inventory_id: str) -> Optional[dict]:
+    return await inventory_store.get(inventory_id)
+
+
+async def list_inventory(
+    status: Optional[str] = None, page: int = 1, page_size: int = 20, owner_id: Optional[str] = None
+) -> dict:
+    query = {k: v for k, v in {"status": status, "owner_id": owner_id}.items() if v}
     items = await inventory_store.find(query, skip=(page - 1) * page_size, limit=page_size, sort=("created_at", -1))
     return {"items": items, "total": await inventory_store.count(query)}
 

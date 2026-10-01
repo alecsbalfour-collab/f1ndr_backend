@@ -20,9 +20,8 @@ def client():
 
 
 @pytest.fixture(scope="module")
-def auth_headers():
-    from api.routes.auth_routes import create_access_token
-    return {"Authorization": f"Bearer {create_access_token('test-user')}"}
+def auth_headers(headers_for):
+    return headers_for("admin")
 
 
 @pytest.mark.parametrize("name", MODULES)
@@ -51,21 +50,21 @@ def test_entrypoints_import(entrypoint):
 @pytest.mark.parametrize(
     "method,path,body,expected",
     [
-        ("get", "/f1ndr/status", None, 200),
-        ("post", "/f1ndr/search", {"make": "Honda"}, 200),
-        ("post", "/f1ndr/intelligence", {"title": "2003 Honda Accord", "price": 5000}, 200),
-        ("get", "/trinn/status", None, 200),
-        ("get", "/trinn/config", None, 200),
-        ("post", "/trinn/schedule", {"task": "vin", "vin": VIN, "interval": 1}, 200),
-        ("get", "/sellr/status", None, 200),
-        ("post", "/sellr/listings", {"title": "2003 Honda Accord", "price": 5000}, 201),
-        ("get", "/listr/status", None, 200),
-        ("get", "/listr/platforms", None, 200),
-        ("post", "/listr/listings?platform=kijiji", {"title": "Accord"}, 201),
-        ("put", "/listr/listings/abc?platform=kijiji", {"title": "Accord"}, 200),
-        ("get", "/dealr/status", None, 200),
-        ("post", "/dealr/inventory", {"name": "Lot A"}, 201),
-        ("put", "/dealr/inventory/inv1", {"name": "Lot A"}, 200),
+        ("get", "/api/v1/f1ndr/status", None, 200),
+        ("post", "/api/v1/f1ndr/search", {"make": "Honda"}, 200),
+        ("post", "/api/v1/f1ndr/intelligence", {"title": "2003 Honda Accord", "price": 5000}, 200),
+        ("get", "/api/v1/trinn/status", None, 200),
+        ("get", "/api/v1/trinn/config", None, 200),
+        ("post", "/api/v1/trinn/schedule", {"task": "vin", "vin": VIN, "interval": 1}, 200),
+        ("get", "/api/v1/sellr/status", None, 200),
+        ("post", "/api/v1/sellr/listings", {"title": "2003 Honda Accord", "price": 5000}, 201),
+        ("get", "/api/v1/listr/status", None, 200),
+        ("get", "/api/v1/listr/platforms", None, 200),
+        ("post", "/api/v1/listr/listings?platform=kijiji", {"title": "Accord"}, 201),
+        ("put", "/api/v1/listr/listings/abc?platform=kijiji", {"title": "Accord"}, 200),
+        ("get", "/api/v1/dealr/status", None, 200),
+        ("post", "/api/v1/dealr/inventory", {"name": "Lot A"}, 201),
+        ("put", "/api/v1/dealr/inventory/inv1", {"name": "Lot A"}, 200),
     ],
 )
 def test_endpoints(client, auth_headers, method, path, body, expected):
@@ -76,30 +75,32 @@ def test_endpoints(client, auth_headers, method, path, body, expected):
     assert payload.get("success", True) is not False, payload
 
 
-def test_sellr_listing_crud_roundtrip(client):
-    created = client.post("/sellr/listings", json={"title": "Civic", "price": 7500, "user_id": "u-crud"}).json()["data"]
+def test_sellr_listing_crud_roundtrip(client, headers_for):
+    seller = headers_for("user", sub="u-crud")
+    created = client.post("/api/v1/sellr/listings", json={"title": "Civic", "price": 7500}, headers=seller).json()["data"]
+    assert created["user_id"] == "u-crud"
     listing_id = created["id"]
-    assert client.get(f"/sellr/listings/{listing_id}").json()["data"]["title"] == "Civic"
-    assert client.get("/sellr/listings?user_id=u-crud").json()["data"]["total"] == 1
-    assert client.put(f"/sellr/listings/{listing_id}", json={"price": 7000}).json()["data"]["price"] == 7000
-    assert client.delete(f"/sellr/listings/{listing_id}").json()["success"] is True
-    assert client.get(f"/sellr/listings/{listing_id}").json()["success"] is False
+    assert client.get(f"/api/v1/sellr/listings/{listing_id}").json()["data"]["title"] == "Civic"
+    assert client.get("/api/v1/sellr/listings?user_id=u-crud").json()["pagination"]["total"] == 1
+    assert client.put(f"/api/v1/sellr/listings/{listing_id}", json={"price": 7000}, headers=seller).json()["data"]["price"] == 7000
+    assert client.delete(f"/api/v1/sellr/listings/{listing_id}", headers=seller).json()["success"] is True
+    assert client.get(f"/api/v1/sellr/listings/{listing_id}").json()["success"] is False
 
 
 def test_dealr_inventory_crud_roundtrip(client, auth_headers):
-    created = client.post("/dealr/inventory", json={"name": "Lot CRUD", "status": "crud"}, headers=auth_headers).json()["data"]
-    assert client.get("/dealr/inventory?status=crud", headers=auth_headers).json()["pagination"]["total"] == 1
-    assert client.delete(f"/dealr/inventory/{created['id']}", headers=auth_headers).json()["success"] is True
-    assert client.delete(f"/dealr/inventory/{created['id']}", headers=auth_headers).json()["success"] is False
+    created = client.post("/api/v1/dealr/inventory", json={"name": "Lot CRUD", "status": "crud"}, headers=auth_headers).json()["data"]
+    assert client.get("/api/v1/dealr/inventory?status=crud", headers=auth_headers).json()["pagination"]["total"] == 1
+    assert client.delete(f"/api/v1/dealr/inventory/{created['id']}", headers=auth_headers).json()["success"] is True
+    assert client.delete(f"/api/v1/dealr/inventory/{created['id']}", headers=auth_headers).json()["success"] is False
 
 
 @pytest.mark.parametrize(
     "method,path",
     [
-        ("post", "/dealr/inventory"),
-        ("get", "/dealr/inventory"),
-        ("put", "/dealr/inventory/inv1"),
-        ("delete", "/dealr/inventory/inv1"),
+        ("post", "/api/v1/dealr/inventory"),
+        ("get", "/api/v1/dealr/inventory"),
+        ("put", "/api/v1/dealr/inventory/inv1"),
+        ("delete", "/api/v1/dealr/inventory/inv1"),
     ],
 )
 @pytest.mark.parametrize("token", [None, "not-a-jwt", "refresh"])
@@ -113,12 +114,12 @@ def test_dealr_inventory_requires_access_token(client, method, path, token):
 
 
 def test_dealr_status_is_public(client):
-    assert client.get("/dealr/status").status_code == 200
+    assert client.get("/api/v1/dealr/status").status_code == 200
 
 
 def test_cors_preflight_allows_browser_origin(client):
     response = client.options(
-        "/dealr/inventory",
+        "/api/v1/dealr/inventory",
         headers={
             "Origin": "http://localhost:3000",
             "Access-Control-Request-Method": "GET",
@@ -142,10 +143,17 @@ def test_cors_production_origins(monkeypatch):
     assert allowed("https://dealr.example.com") == "https://dealr.example.com"
     assert allowed("http://localhost:5173") == "http://localhost:5173"
     assert allowed("https://shop.flutterflow.app") == "https://shop.flutterflow.app"
+    assert allowed("https://dealrlink.com") == "https://dealrlink.com"
+    assert allowed("https://www.dealrlink.com") == "https://www.dealrlink.com"
+    assert allowed("http://dealrlink.com") is None
+    assert allowed("https://dealrlink.com.evil.io") is None
+    assert allowed("https://f1ndr.ca") == "https://f1ndr.ca"
+    assert allowed("https://app.f1ndr.ca") == "https://app.f1ndr.ca"
+    assert allowed("https://f1ndr.ca.evil.io") is None
     assert allowed("https://evil.com") is None
     assert allowed("https://evil.com.flutterflow.app.attacker.io") is None
 
 
-def test_sellr_keeps_price_when_market_value_unknown(client):
-    response = client.post("/sellr/listings", json={"title": "Civic", "price": 7500})
+def test_sellr_keeps_price_when_market_value_unknown(client, auth_headers):
+    response = client.post("/api/v1/sellr/listings", json={"title": "Civic", "price": 7500}, headers=auth_headers)
     assert response.json()["data"]["price"] == 7500

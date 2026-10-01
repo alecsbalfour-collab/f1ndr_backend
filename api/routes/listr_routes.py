@@ -4,9 +4,10 @@ DICT-aligned listr API routes with FlutterFlow compatibility and enterprise feat
 """
 
 import logging
-from fastapi import APIRouter, Query, HTTPException
-from typing import Dict, Any, Optional
-from utils.response_builder import success_response, error_response, paginated_response
+from fastapi import APIRouter, Depends
+from api.dependencies.auth import require_scopes
+from api.schemas.common import Envelope, ModuleStatus, ok
+from api.schemas.list_schemas import ListrPlatform, ListrResult, PlatformList, VehicleIn
 from listr.config.config import get_listr_config
 from listr.core.core import push_listing, update_listing
 
@@ -16,42 +17,36 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["listr"])
 
 
-@router.get("/status")
-async def listr_status() -> Dict[str, Any]:
+@router.get("/status", response_model=Envelope[ModuleStatus])
+async def listr_status():
     """
     Get listr module status with FlutterFlow-compatible response.
     
     Returns:
         FlutterFlow-compatible status response
     """
-    try:
-        config = get_listr_config()
-        
-        return success_response(
-            data={
-                "module": "listr",
-                "status": "operational",
-                "config": {
-                    "supported_platforms": config["supported_platforms"],
-                    "max_title_length": config["max_title_length"],
-                    "sync_enabled": config["sync_enabled"],
-                    "sync_interval_hours": config["sync_interval_hours"],
-                },
+    config = get_listr_config()
+    return ok(
+        {
+            "module": "listr",
+            "status": "operational",
+            "config": {
+                "supported_platforms": config["supported_platforms"],
+                "max_title_length": config["max_title_length"],
+                "sync_enabled": config["sync_enabled"],
+                "sync_interval_hours": config["sync_interval_hours"],
             },
-            message="Listr module operational"
-        )
-        
-    except Exception as e:
-        logger.error(f"Failed to get listr status: {e}")
-        return error_response(
-            message=f"Failed to get status: {str(e)}",
-            status_code=500,
-            error_code="STATUS_ERROR"
-        )
+        },
+        "Listr module operational",
+    )
 
 
-@router.post("/listings")
-async def push_listing_endpoint(listing_data: Dict[str, Any], platform: str) -> Dict[str, Any]:
+# Posting to external marketplaces is for dealer accounts.
+_PUBLISHER = [Depends(require_scopes("inventory:write"))]
+
+
+@router.post("/listings", status_code=201, response_model=Envelope[ListrResult], dependencies=_PUBLISHER)
+async def push_listing_endpoint(listing_data: VehicleIn, platform: ListrPlatform):
     """
     Push listing to platform with enterprise validation and FlutterFlow compatibility.
     
@@ -62,29 +57,16 @@ async def push_listing_endpoint(listing_data: Dict[str, Any], platform: str) -> 
     Returns:
         FlutterFlow-compatible response
     """
-    try:
-        logger.info(f"Pushing listing to platform: {platform}")
-        
-        # Use listr core functionality
-        result = await push_listing(platform, listing_data)
-        
-        return success_response(
-            data=result,
-            message=f"Listing pushed to {platform} successfully",
-            status_code=201
-        )
-        
-    except Exception as e:
-        logger.error(f"Push listing failed: {e}")
-        return error_response(
-            message=f"Failed to push listing: {str(e)}",
-            status_code=500,
-            error_code="PUSH_LISTING_ERROR"
-        )
+    logger.info(f"Pushing listing to platform: {platform}")
+    
+    # Use listr core functionality
+    result = await push_listing(platform, listing_data.to_data())
+    
+    return ok(result, f"Listing pushed to {platform} successfully")
 
 
-@router.put("/listings/{listing_id}")
-async def update_listing_endpoint(listing_id: str, listing_data: Dict[str, Any], platform: str) -> Dict[str, Any]:
+@router.put("/listings/{listing_id}", response_model=Envelope[ListrResult], dependencies=_PUBLISHER)
+async def update_listing_endpoint(listing_id: str, listing_data: VehicleIn, platform: ListrPlatform):
     """
     Update listing on platform with enterprise validation and FlutterFlow compatibility.
     
@@ -96,49 +78,27 @@ async def update_listing_endpoint(listing_id: str, listing_data: Dict[str, Any],
     Returns:
         FlutterFlow-compatible response
     """
-    try:
-        logger.info(f"Updating listing {listing_id} on platform: {platform}")
-        
-        # Use listr core functionality
-        result = await update_listing(platform, {**listing_data, "id": listing_id})
-        
-        return success_response(
-            data=result,
-            message=f"Listing updated on {platform} successfully"
-        )
-        
-    except Exception as e:
-        logger.error(f"Update listing failed: {e}")
-        return error_response(
-            message=f"Failed to update listing: {str(e)}",
-            status_code=500,
-            error_code="UPDATE_LISTING_ERROR"
-        )
+    logger.info(f"Updating listing {listing_id} on platform: {platform}")
+    
+    # Use listr core functionality
+    result = await update_listing(platform, {**listing_data.to_data(), "id": listing_id})
+    
+    return ok(result, f"Listing updated on {platform} successfully")
 
 
-@router.get("/platforms")
-async def get_platforms() -> Dict[str, Any]:
+@router.get("/platforms", response_model=Envelope[PlatformList])
+async def get_platforms():
     """
     Get supported platforms with FlutterFlow compatibility.
     
     Returns:
         FlutterFlow-compatible response with platform list
     """
-    try:
-        config = get_listr_config()
-        
-        return success_response(
-            data={
-                "platforms": config["supported_platforms"],
-                "count": len(config["supported_platforms"]),
-            },
-            message="Supported platforms retrieved"
-        )
-        
-    except Exception as e:
-        logger.error(f"Failed to get platforms: {e}")
-        return error_response(
-            message=f"Failed to get platforms: {str(e)}",
-            status_code=500,
-            error_code="GET_PLATFORMS_ERROR"
-        )
+    config = get_listr_config()
+    return ok(
+        {
+            "platforms": config["supported_platforms"],
+            "count": len(config["supported_platforms"]),
+        },
+        "Supported platforms retrieved",
+    )

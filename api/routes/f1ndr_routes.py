@@ -4,9 +4,12 @@ DICT-aligned f1ndr API routes with FlutterFlow compatibility and enterprise feat
 """
 
 import logging
-from fastapi import APIRouter, Query, HTTPException
-from typing import Dict, Any, Optional
-from utils.response_builder import success_response, error_response, paginated_response
+from fastapi import APIRouter, Depends, Query
+from api.dependencies.auth import require_user
+from typing import Optional
+from api.schemas.common import VIN, Envelope, ModuleStatus, Page, ok, paged
+from api.schemas.list_schemas import VehicleIn, VehicleOut
+from api.schemas.search_schema import IntelligenceResult, MarketValue, SearchRequest, SearchResults, VinDecodeRequest, VinDecodeResult
 from f1ndr.vin.decode import decode_vin
 from f1ndr.config.config import get_f1ndr_config
 from f1ndr.core.core import run_search, run_intelligence
@@ -17,40 +20,31 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["f1ndr"])
 
 
-@router.get("/status")
-async def f1ndr_status() -> Dict[str, Any]:
+@router.get("/status", response_model=Envelope[ModuleStatus])
+async def f1ndr_status():
     """
     Get f1ndr module status with FlutterFlow-compatible response.
     
     Returns:
         FlutterFlow-compatible status response
     """
-    try:
-        config = get_f1ndr_config()
-        
-        return success_response(
-            data={
-                "module": "f1ndr",
-                "status": "operational",
-                "config": {
-                    "api_version": config.get("api_version", "1.0.0"),
-                    "enabled_features": config.get("enabled_features", []),
-                },
+    config = get_f1ndr_config()
+    return ok(
+        {
+            "module": "f1ndr",
+            "status": "operational",
+            "config": {
+                "api_version": config.get("api_version", "1.0.0"),
+                "enabled_features": config.get("enabled_features", []),
             },
-            message="F1NDR module operational"
-        )
-        
-    except Exception as e:
-        logger.error(f"Failed to get f1ndr status: {e}")
-        return error_response(
-            message=f"Failed to get status: {str(e)}",
-            status_code=500,
-            error_code="STATUS_ERROR"
-        )
+        },
+        "F1NDR module operational",
+    )
 
 
-@router.post("/vin/decode")
-async def decode_vin_endpoint(vin_data: Dict[str, Any]) -> Dict[str, Any]:
+# Authenticated: each call makes an outbound request to NHTSA.
+@router.post("/vin/decode", response_model=Envelope[VinDecodeResult], dependencies=[Depends(require_user)])
+async def decode_vin_endpoint(vin_data: VinDecodeRequest):
     """
     Decode VIN with enterprise validation and FlutterFlow compatibility.
     
@@ -60,42 +54,22 @@ async def decode_vin_endpoint(vin_data: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         FlutterFlow-compatible response with decoded VIN data
     """
-    try:
-        vin = vin_data.get("vin")
-        if not vin:
-            return error_response(
-                message="VIN is required",
-                status_code=400,
-                error_code="MISSING_VIN"
-            )
-        
-        logger.info(f"Decoding VIN: {vin}")
-        
-        # Use f1ndr core functionality
-        decoded = decode_vin(vin)
-        
-        return success_response(
-            data=decoded,
-            message="VIN decoded successfully"
-        )
-        
-    except Exception as e:
-        logger.error(f"VIN decode failed: {e}")
-        return error_response(
-            message=f"Failed to decode VIN: {str(e)}",
-            status_code=500,
-            error_code="VIN_DECODE_ERROR"
-        )
+    logger.info(f"Decoding VIN: {vin_data.vin}")
+    
+    # Use f1ndr core functionality
+    decoded = decode_vin(vin_data.vin)
+    
+    return ok(decoded, "VIN decoded successfully")
 
 
-@router.get("/vehicles")
+@router.get("/vehicles", response_model=Page[VehicleOut])
 async def get_vehicles(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     make: Optional[str] = None,
     model: Optional[str] = None,
     year: Optional[int] = None
-) -> Dict[str, Any]:
+):
     """
     Get vehicles with FlutterFlow-compatible pagination and filtering.
     
@@ -109,50 +83,28 @@ async def get_vehicles(
     Returns:
         FlutterFlow-compatible paginated response
     """
-    try:
-        logger.info(f"Getting vehicles - page: {page}, make: {make}, model: {model}, year: {year}")
-        
-        # TODO: Implement actual database query
-        results = []
-        total = 0
-        
-        return paginated_response(
-            data=results,
-            total=total,
-            page=page,
-            page_size=page_size,
-            message="Vehicles retrieved"
-        )
-        
-    except Exception as e:
-        logger.error(f"Get vehicles failed: {e}")
-        return error_response(
-            message=f"Failed to get vehicles: {str(e)}",
-            status_code=500,
-            error_code="GET_VEHICLES_ERROR"
-        )
+    logger.info(f"Getting vehicles - page: {page}, make: {make}, model: {model}, year: {year}")
+    
+    # TODO: Implement actual database query
+    results = []
+    total = 0
+    
+    return paged(results, total, page, page_size, "Vehicles retrieved")
 
 
-@router.post("/search")
-async def search_endpoint(params: Dict[str, Any]) -> Dict[str, Any]:
-    try:
-        return success_response(data=run_search(params), message="Search completed")
-    except Exception as e:
-        logger.error(f"Search failed: {e}")
-        return error_response(message=f"Search failed: {str(e)}", status_code=500, error_code="SEARCH_ERROR")
+@router.post("/search", response_model=Envelope[SearchResults])
+async def search_endpoint(params: SearchRequest):
+    return ok(run_search(params.model_dump(exclude_none=True)), "Search completed")
 
 
-@router.post("/intelligence")
-async def intelligence_endpoint(listing: Dict[str, Any]) -> Dict[str, Any]:
-    try:
-        return success_response(data=run_intelligence(listing), message="Intelligence completed")
-    except Exception as e:
-        logger.error(f"Intelligence failed: {e}")
-        return error_response(message=f"Intelligence failed: {str(e)}", status_code=500, error_code="INTELLIGENCE_ERROR")
+# Authenticated: the enriched listing is persisted.
+@router.post("/intelligence", response_model=Envelope[IntelligenceResult], dependencies=[Depends(require_user)])
+async def intelligence_endpoint(listing: VehicleIn):
+    return ok(run_intelligence(listing.to_data()), "Intelligence completed")
 
 
-@router.get("/market/value")
-async def get_market_value(vin: str, mileage: Optional[int] = None) -> Dict[str, Any]:
+@router.get("/market/value", response_model=Envelope[MarketValue])
+async def get_market_value(vin: VIN, mileage: Optional[int] = Query(None, ge=0)):
     """
     Get market value for vehicle with enterprise validation and FlutterFlow compatibility.
     
@@ -163,28 +115,16 @@ async def get_market_value(vin: str, mileage: Optional[int] = None) -> Dict[str,
     Returns:
         FlutterFlow-compatible response with market value data
     """
-    try:
-        logger.info(f"Getting market value for VIN: {vin}, mileage: {mileage}")
-        
-        # TODO: Implement actual market value calculation
-        # This would use f1ndr.intelligence.market functions
-        
-        market_data = {
-            "vin": vin,
-            "market_value": 0,
-            "confidence": 0.0,
-            "mileage": mileage,
-        }
-        
-        return success_response(
-            data=market_data,
-            message="Market value calculated"
-        )
-        
-    except Exception as e:
-        logger.error(f"Get market value failed: {e}")
-        return error_response(
-            message=f"Failed to get market value: {str(e)}",
-            status_code=500,
-            error_code="MARKET_VALUE_ERROR"
-        )
+    logger.info(f"Getting market value for VIN: {vin}, mileage: {mileage}")
+    
+    # TODO: Implement actual market value calculation
+    # This would use f1ndr.intelligence.market functions
+    
+    market_data = {
+        "vin": vin,
+        "market_value": 0,
+        "confidence": 0.0,
+        "mileage": mileage,
+    }
+    
+    return ok(market_data, "Market value calculated")

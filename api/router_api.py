@@ -22,6 +22,9 @@ from api.routes.controllers.list_controller import router as list_controller_rou
 
 logger = logging.getLogger(__name__)
 
+API_V1_PREFIX = "/api/v1"
+
+# Mounted under API_V1_PREFIX (and, deprecated, unversioned). Health lives at the root only.
 api_router = APIRouter()
 
 # Mount module routers with prefixes
@@ -35,8 +38,12 @@ api_router.include_router(auth_router, prefix="/auth")
 api_router.include_router(scraper_router, prefix="/scrapers")
 
 # Mount controller routers
-api_router.include_router(health_router)
 api_router.include_router(version_router)
 api_router.include_router(list_controller_router)
+
+# First path segment of every API route, e.g. "/auth"; used to recognise deprecated unversioned calls.
+LEGACY_PREFIXES = tuple(sorted({"/" + route.path.split("/")[1] for route in api_router.routes}))
+
+__all__ = ["API_V1_PREFIX", "LEGACY_PREFIXES", "api_router", "health_router"]
 
 logger.info("API routes configured with FlutterFlow compatibility")

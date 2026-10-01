@@ -1,31 +1,53 @@
-version: "3.9"
+# Credentials and secrets come from the environment or a local .env (never committed).
+# MONGO_INITDB_* only apply when a volume is first created; existing volumes keep their original users.
 
 services:
+  api:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME:?set MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD:?set MONGO_ROOT_PASSWORD}@mongo_main:27017/?authSource=admin
+      MONGODB_DB_NAME: ${MONGODB_DB_NAME:-f1ndr}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?set JWT_SECRET_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      WORKERS: ${WORKERS:-1}
+    depends_on:
+      mongo_main:
+        condition: service_healthy
+
   mongo_main:
-    image: mongo:latest
+    image: mongo:8.3
     container_name: mongo_main
     restart: unless-stopped
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: admin
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:?set MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?set MONGO_ROOT_PASSWORD}
     volumes:
       - mongo_main_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   mongo_scraper:
-    image: mongo:latest
+    image: mongo:8.3
     container_name: mongo_scraper
     restart: unless-stopped
     ports:
       - "27018:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: admin
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_SCRAPER_ROOT_USERNAME:-${MONGO_ROOT_USERNAME:?set MONGO_ROOT_USERNAME}}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_SCRAPER_ROOT_PASSWORD:-${MONGO_ROOT_PASSWORD:?set MONGO_ROOT_PASSWORD}}
     volumes:
       - mongo_scraper_data:/data/db
 
 volumes:
   mongo_main_data:
   mongo_scraper_data:
-

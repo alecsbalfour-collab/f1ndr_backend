@@ -85,6 +85,7 @@ async def test_startup_fails_when_mongo_required(settings_env):
 
 def test_production_requires_mongo_by_default(settings_env):
     settings_env.setenv("ENVIRONMENT", "production")
+    settings_env.setenv("JWT_SECRET_KEY", "p" * 48)
     settings_env.delenv("MONGODB_REQUIRED", raising=False)
     assert get_settings().mongodb_required is True
 
@@ -116,6 +117,10 @@ async def test_document_store_and_modules_on_mongo(settings_env):
         stored = await listings_store.get(f"kijiji:{pushed['listing']['id']}")
         assert stored["title"] == "Mongo listing"
         await listings_store.delete(stored["key"])
+
+        from api.routes.controllers.health_controller import readiness_report
+        ready, checks = await readiness_report()
+        assert ready and checks["mongo"]["status"] == "ok"
     finally:
         await on_shutdown(app)
     assert connection_db.get_database() is None

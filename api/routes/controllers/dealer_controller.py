@@ -51,7 +51,7 @@ class DealerController:
         except Exception as e:
             logger.error(f"Dealer search failed: {e}")
             return error_response(
-                message=f"Search failed: {str(e)}",
+                message="Search failed",
                 status_code=500,
                 error_code="SEARCH_ERROR"
             )
@@ -77,7 +77,7 @@ class DealerController:
         except Exception as e:
             logger.error(f"Get dealer failed: {e}")
             return error_response(
-                message=f"Failed to get dealer: {str(e)}",
+                message="Failed to get dealer",
                 status_code=500,
                 error_code="GET_DEALER_ERROR"
             )
@@ -107,7 +107,7 @@ class DealerController:
         except Exception as e:
             logger.error(f"Create dealer failed: {e}")
             return error_response(
-                message=f"Failed to create dealer: {str(e)}",
+                message="Failed to create dealer",
                 status_code=500,
                 error_code="CREATE_DEALER_ERROR"
             )
@@ -137,7 +137,7 @@ class DealerController:
         except Exception as e:
             logger.error(f"Update dealer failed: {e}")
             return error_response(
-                message=f"Failed to update dealer: {str(e)}",
+                message="Failed to update dealer",
                 status_code=500,
                 error_code="UPDATE_DEALER_ERROR"
             )
@@ -165,7 +165,7 @@ class DealerController:
         except Exception as e:
             logger.error(f"Delete dealer failed: {e}")
             return error_response(
-                message=f"Failed to delete dealer: {str(e)}",
+                message="Failed to delete dealer",
                 status_code=500,
                 error_code="DELETE_DEALER_ERROR"
             )
