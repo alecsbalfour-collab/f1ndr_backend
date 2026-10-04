@@ -12,6 +12,7 @@ def serialize_listing(listing: Dict[str, Any]) -> Dict[str, Any]:
     allowed_keys = {
         "id",
         "vin",
+        "category",
         "title",
         "description",
         "make",

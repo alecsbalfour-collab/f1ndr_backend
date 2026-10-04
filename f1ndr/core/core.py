@@ -17,11 +17,12 @@ from f1ndr.utils.utils import (
 def run_search(params: dict) -> dict:
     """
     Perform a search over stored listings using simple filters.
-    params may include: make, model, year_min, year_max, price_min, price_max, text.
+    params may include: category, make, model, year_min, year_max, price_min, price_max, text.
     """
     config = get_f1ndr_config()
     listings = query_listings()
 
+    category = params.get("category")
     make = params.get("make")
     model = params.get("model")
     year_min = params.get("year_min")
@@ -31,6 +32,9 @@ def run_search(params: dict) -> dict:
     text = params.get("text", "").lower().strip()
 
     def matches(l: dict) -> bool:
+        # Listings stored before `category` existed are cars.
+        if category and (l.get("category") or "car") != category:
+            return False
         if make and l.get("make") != make:
             return False
         if model and l.get("model") != model:

@@ -44,8 +44,16 @@ async def _baseline(db: AsyncIOMotorDatabase) -> None:
     """Start version tracking; the current indexes come from the declarative definitions."""
 
 
+async def _vehicle_category_default(db: AsyncIOMotorDatabase) -> None:
+    """Backfill `category: "car"` on listing documents written before the field existed."""
+    # `{field: None}` matches both missing and explicit-null values.
+    for name in ("dealr_inventory", "sellr_listings", "listr_listings"):
+        await db[name].update_many({"category": None}, {"$set": {"category": "car"}})
+
+
 MIGRATIONS: List[Migration] = [
     Migration(1, "baseline", _baseline),
+    Migration(2, "vehicle_category_default", _vehicle_category_default),
 ]
 
 

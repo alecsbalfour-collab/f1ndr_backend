@@ -34,6 +34,9 @@ def seller(headers_for):
         ("post", "/api/v1/sellr/listings", {"title": "Civic", "price": 100, "year": 1700}),
         ("post", "/api/v1/sellr/listings", {"title": "Civic", "price": 100, "$where": "1"}),
         ("post", "/api/v1/sellr/listings", {"title": "Civic", "price": 100, "a.b": 1}),
+        ("post", "/api/v1/sellr/listings", {"title": "Civic", "price": 100, "category": "spaceship"}),
+        ("post", "/api/v1/f1ndr/search", {"category": "spaceship"}),
+        ("post", "/api/v1/dealr/inventory", {"category": "spaceship"}),
         ("post", "/api/v1/sellr/listings", ["not", "an", "object"]),
         ("post", "/api/v1/f1ndr/vin/decode", {"vin": "TOO-SHORT"}),
         ("post", "/api/v1/f1ndr/vin/decode", {"vin": "1HGCM82633A00435O"}),
@@ -66,6 +69,35 @@ def test_listing_keeps_extra_fields_but_not_server_managed_ones(client, seller):
     assert created["id"] != "chosen-by-client"
     stored = client.get(f"/api/v1/sellr/listings/{created['id']}").json()["data"]
     assert stored["created_at"] != "1999-01-01" and "_id" not in stored
+
+
+def test_category_defaults_to_car_and_filters(client, seller, headers_for):
+    car = client.post("/api/v1/sellr/listings", json={"title": "Civic", "price": 7500}, headers=seller).json()["data"]
+    rv = client.post("/api/v1/sellr/listings", json={"title": "Fifth Wheel", "price": 40000, "category": "fifth_wheel"},
+                     headers=seller).json()["data"]
+    assert car["category"] == "car" and rv["category"] == "fifth_wheel"
+
+    listed = lambda c: {i["id"] for i in client.get("/api/v1/sellr/listings", params={"category": c}).json()["data"]}
+    assert rv["id"] in listed("fifth_wheel") and car["id"] not in listed("fifth_wheel")
+    assert car["id"] in listed("car") and rv["id"] not in listed("car")
+
+    # Explicit null and invalid categories behave like omitting the field / a bad value.
+    cleared = client.put(f"/api/v1/sellr/listings/{rv['id']}", json={"category": None}, headers=seller).json()["data"]
+    assert cleared["category"] == "car"
+
+    dealer = headers_for("dealer", sub="cat-dealer")
+    item = client.post("/api/v1/dealr/inventory", json={"name": "Lot", "category": "motorcycle"}, headers=dealer).json()["data"]
+    assert item["category"] == "motorcycle"
+    ids = {i["id"] for i in client.get("/api/v1/dealr/inventory", params={"category": "motorcycle"}, headers=dealer).json()["data"]}
+    assert item["id"] in ids
+    ids = {i["id"] for i in client.get("/api/v1/dealr/inventory", params={"category": "truck"}, headers=dealer).json()["data"]}
+    assert item["id"] not in ids
+
+    seeded = client.post("/api/v1/f1ndr/intelligence", json={"title": "Toy Hauler X1", "price": 30000, "category": "toy_hauler"},
+                         headers=seller)
+    assert seeded.status_code == 200
+    titles = lambda c: {r["title"] for r in client.post("/api/v1/f1ndr/search", json={"category": c}).json()["data"]["results"]}
+    assert "Toy Hauler X1" in titles("toy_hauler") and "Toy Hauler X1" not in titles("car")
 
 
 def test_partial_update_only_touches_sent_fields(client, seller):

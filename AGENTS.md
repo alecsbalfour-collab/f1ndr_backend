@@ -54,7 +54,7 @@ Work one session per group; tick items off here as they land. Keep each group to
 Priority order of open groups: Before tester release -> Session 3+ (observability first, Sentry helps testers) -> dealr RVs & towables -> Pricing -> Auth expansion (A2-A5 wait on provider accounts).
 
 ### Before tester release (next)
-- [ ] Vehicle `category` on inventory, sellr/listr listings and search filters (`car`, `truck`, `motorcycle`, `motorhome_a`, `motorhome_b`, `motorhome_c`, `travel_trailer`, `fifth_wheel`, `toy_hauler`, `truck_camper`, `other`). Must land before testers create data; adding it later needs a data migration. Default existing docs to `car` in a migration.
+- [x] Vehicle `category` on inventory, sellr/listr listings and search filters (`car`, `truck`, `motorcycle`, `motorhome_a`, `motorhome_b`, `motorhome_c`, `travel_trailer`, `fifth_wheel`, `toy_hauler`, `truck_camper`, `other`). Must land before testers create data; adding it later needs a data migration. Default existing docs to `car` in a migration.
 - [ ] Replace placeholders testers will hit: watchr alerts/subscriptions persisted per user (list/delete real), f1ndr `/vehicles` and `/listings/*` querying stored listings, market value returns `null` (not `0`) until Pricing lands so clients don't show $0.
 - [ ] Scheduled trinn tasks never run (see Session 2 note): decide on an in-process stopgap (start the scheduler in the lifespan while `WORKERS=1`) or wait for ARQ.
 - [ ] A1 Password reset, pulled forward from Auth expansion: testers will forget passwords.

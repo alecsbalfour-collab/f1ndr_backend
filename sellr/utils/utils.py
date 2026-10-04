@@ -13,13 +13,14 @@ from db.document_store import DocumentStore
 
 logger = logging.getLogger(__name__)
 
-listings_store = DocumentStore("sellr_listings", key="id", indexes=("user_id", "status", "platform"))
+listings_store = DocumentStore("sellr_listings", key="id", indexes=("user_id", "status", "platform", "category"))
 
 
 async def save_listing(listing: Dict[str, Any]) -> str:
     """Save listing with enterprise metadata. Returns the listing ID."""
     now = datetime.utcnow().isoformat()
     listing_id = listing.get("id") or str(uuid.uuid4())
+    listing["category"] = listing.get("category") or "car"
     await listings_store.upsert({
         **listing,
         "id": listing_id,
@@ -37,13 +38,15 @@ async def update_listing(listing_id: str, listing_data: Dict[str, Any]) -> bool:
     if existing is None:
         logger.warning(f"Listing not found for update: {listing_id}")
         return False
-    await listings_store.upsert({
+    merged = {
         **existing,
         **listing_data,
         "id": listing_id,
         "created_at": existing.get("created_at"),
         "updated_at": datetime.utcnow().isoformat(),
-    })
+    }
+    merged["category"] = merged.get("category") or "car"
+    await listings_store.upsert(merged)
     logger.info(f"Listing updated: {listing_id}")
     return True
 

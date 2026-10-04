@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional
 from api.dependencies.auth import is_admin, owns, require_scopes
 from api.schemas.common import Envelope, ModuleStatus, Page, error_responses, ok, paged
 from api.schemas.dealr_schemas import InventoryIn, InventoryItem
+from api.schemas.list_schemas import VehicleCategory
 from utils.response_builder import error_response
 from dealr.config.dealr_config import dealr_config
 from dealr.core.core import ingest_inventory, sync_inventory
@@ -69,6 +70,7 @@ async def get_inventory(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     status: Optional[str] = None,
+    category: Optional[VehicleCategory] = None,
     claims: Dict[str, Any] = Depends(_READER),
 ):
     """
@@ -78,14 +80,15 @@ async def get_inventory(
         page: Page number (default: 1)
         page_size: Number of results per page (default: 20)
         status: Optional status filter
-        
+        category: Optional vehicle category filter
+
     Returns:
         FlutterFlow-compatible paginated response
     """
-    logger.info(f"Getting inventory - page: {page}, status: {status}")
+    logger.info(f"Getting inventory - page: {page}, status: {status}, category: {category}")
     # Dealers see their own inventory; admins see everything.
     owner_id = None if is_admin(claims) else claims["sub"]
-    result = await inventory_repo.list_inventory(status, page, page_size, owner_id=owner_id)
+    result = await inventory_repo.list_inventory(status, page, page_size, owner_id=owner_id, category=category)
     return paged(result["items"], result["total"], page, page_size, "Inventory retrieved")
 
 

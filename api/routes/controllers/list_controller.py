@@ -7,7 +7,7 @@ import logging
 from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, Query
 from api.schemas.common import Page, paged
-from api.schemas.list_schemas import VehicleOut
+from api.schemas.list_schemas import VehicleCategory, VehicleOut
 from utils.response_builder import success_response, error_response, paginated_response
 
 
@@ -22,7 +22,7 @@ async def get_unified_listings(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     search: Optional[str] = None,
-    category: Optional[str] = None,
+    category: Optional[VehicleCategory] = None,
     min_price: Optional[float] = None,
     max_price: Optional[float] = None
 ):

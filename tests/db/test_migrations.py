@@ -126,6 +126,21 @@ async def test_startup_applies_migrations(mongo_db, monkeypatch):
         get_settings.cache_clear()
 
 
+async def test_vehicle_category_backfills_missing_and_null(mongo_db):
+    for name in ("dealr_inventory", "sellr_listings", "listr_listings"):
+        await mongo_db[name].insert_many([
+            {"id": "missing"},
+            {"id": "null", "category": None},
+            {"id": "set", "category": "truck"},
+        ])
+    await apply_migrations(mongo_db)
+    for name in ("dealr_inventory", "sellr_listings", "listr_listings"):
+        docs = {d["id"]: d async for d in mongo_db[name].find()}
+        assert docs["missing"]["category"] == "car"
+        assert docs["null"]["category"] == "car"
+        assert docs["set"]["category"] == "truck"
+
+
 async def test_unknown_applied_versions_are_reported(mongo_db):
     await mongo_db[COLLECTION].insert_one({"_id": 999, "version": 999, "name": "from_the_future"})
     status = await migration_status(mongo_db)

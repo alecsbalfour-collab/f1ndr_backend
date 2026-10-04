@@ -14,6 +14,7 @@ def _prepare(platform: str, listing: dict) -> tuple:
     if platform not in config["supported_platforms"]:
         raise ValueError(f"Unsupported listr platform: {platform}")
     prepared = {**listing, "platform": platform, "updated_at": datetime.utcnow().isoformat()}
+    prepared["category"] = prepared.get("category") or "car"
     if prepared.get("title"):
         prepared["title"] = truncate_title(prepared["title"], config["max_title_length"])
     return config, prepared
