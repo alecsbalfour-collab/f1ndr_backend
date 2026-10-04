@@ -56,7 +56,7 @@ Priority order of open groups: Before tester release -> Session 3+ (observabilit
 ### Before tester release (next)
 - [x] Two-level classification on inventory, sellr/listr listings and search filters: `category` (classifieds vertical: `vehicles`, `real_estate`, `goods`, `services`, `jobs`, `pets`, `community`, `other`; required on create) + `subcategory` (`car`, `truck`, `motorcycle`, `motorhome_a/b/c`, `travel_trailer`, `fifth_wheel`, `toy_hauler`, `truck_camper`, `other`; vehicle kinds only for now). Migration 0003 moves existing docs to `vehicles` + old value as `subcategory` (`car` when absent).
 - [x] Replace placeholders testers will hit: watchr alerts/subscriptions persisted per user (list/delete real), f1ndr `/vehicles` and `/listings/*` querying stored listings, market value returns `null` (not `0`) until Pricing lands so clients don't show $0. Also moved f1ndr listings off the in-memory list and dealr's `listing_service_core` off raw Motor — both now use `DocumentStore`; watchr gained the module contract (`run` + `get_watchr_config`).
-- [ ] Scheduled trinn tasks never run (see Session 2 note): decide on an in-process stopgap (start the scheduler in the lifespan while `WORKERS=1`) or wait for ARQ.
+- [x] Scheduled trinn tasks never run (see Session 2 note): in-process stopgap landed — the lifespan starts `TrinnScheduler` only when `WORKERS<=1` (multi-worker would double-run; ARQ remains the real fix). Tasks are still in-memory only, so a restart forgets the schedule.
 - [ ] A1 Password reset, pulled forward from Auth expansion: testers will forget passwords.
 
 ### Session 1 - Security fixes + wire existing code (Tier 0 + 1)
@@ -75,7 +75,7 @@ Priority order of open groups: Before tester release -> Session 3+ (observabilit
 - [x] Dockerfile: non-root user, `HEALTHCHECK`, multi-stage build.
 - [x] docker-compose: pin `mongo:7`, move `admin/admin` credentials to env. (Compose pins `mongo:8.3`; integration tests use `mongo:7`. Align when choosing the production version.)
 - [x] Split health into `/health/live` and `/health/ready` (Mongo ping, scheduler state). Liveness never checks dependencies; readiness returns 503 `NOT_READY`.
-- Note: nothing starts the trinn scheduler (`api/startup.py` never calls `get_scheduler().start()`), so `/trinn/schedule` stores tasks that never run. Intended fix is the ARQ worker (Redis + background work item).
+- Note: the trinn scheduler now starts in the lifespan when `WORKERS<=1` (in-process stopgap). Scheduled tasks live in memory — restart loses them. Intended fix is the ARQ worker (Redis + background work item).
 
 ### Session 3+ - Enterprise features (Tier 3, one session each)
 - [x] Pydantic request/response models instead of `Dict[str, Any]` bodies (`api/schemas/` exists, unused). `/health` still returns untyped data (waiting on the live/ready split).

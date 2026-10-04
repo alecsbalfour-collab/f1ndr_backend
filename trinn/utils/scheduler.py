@@ -322,6 +322,12 @@ def get_scheduler_state() -> Dict[str, Any]:
     }
 
 
+async def stop_scheduler() -> None:
+    """Stop the global scheduler if it was ever started (no-op otherwise)."""
+    if _scheduler is not None and _scheduler.running:
+        await _scheduler.stop()
+
+
 # Legacy function for backward compatibility
 def schedule_interval(task: Dict[str, Any], hours: int) -> bool:
     """Legacy function to schedule task (deprecated, use TrinnScheduler directly)."""
