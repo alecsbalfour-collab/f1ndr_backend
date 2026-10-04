@@ -1,0 +1,41 @@
+# Render blueprint for f1ndr-backend.
+# Render doesn't host MongoDB — point MONGODB_URI at Atlas (or your own) and
+# leave ENVIRONMENT=production only once that's set, since production requires Mongo.
+services:
+  - type: web
+    name: f1ndr-backend
+    runtime: docker
+    plan: starter
+    healthCheckPath: /health/live
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB_NAME
+        value: f1ndr
+      # Comma-separated admin emails (promoted after they verify)
+      - key: ADMIN_EMAILS
+        sync: false
+      # Comma-separated extra allowed origins (e.g. https://f1ndr.ca)
+      - key: CORS_ORIGINS
+        sync: false
+      # Frontend page for reset links: https://app.f1ndr.ca/reset-password
+      - key: PASSWORD_RESET_URL
+        sync: false
+      # SMTP_* for outbound email (verification + password reset)
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: EMAIL_FROM
+        value: "f1ndr <notifications@f1ndr.ca>"
+      - key: LOG_LEVEL
+        value: info
+      # Keep 1: the in-process scheduler stopgap only runs single-worker.
+      - key: WORKERS
+        value: "1"

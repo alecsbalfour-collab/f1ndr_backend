@@ -111,7 +111,5 @@ backups/
 *.archive.gz
 *.archive.gz.manifest.json
 
-# Render build cache
-render.yaml
 all_my_code.txt
 *-combined.txt
