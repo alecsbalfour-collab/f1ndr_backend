@@ -7,7 +7,7 @@ import logging
 from fastapi import APIRouter, Depends
 from api.dependencies.auth import require_scopes
 from api.schemas.common import Envelope, ModuleStatus, ok
-from api.schemas.list_schemas import ListrPlatform, ListrResult, PlatformList, VehicleIn
+from api.schemas.list_schemas import ListrListingIn, ListrPlatform, ListrResult, PlatformList, VehicleIn
 from listr.config.config import get_listr_config
 from listr.core.core import push_listing, update_listing
 
@@ -46,7 +46,7 @@ _PUBLISHER = [Depends(require_scopes("inventory:write"))]
 
 
 @router.post("/listings", status_code=201, response_model=Envelope[ListrResult], dependencies=_PUBLISHER)
-async def push_listing_endpoint(listing_data: VehicleIn, platform: ListrPlatform):
+async def push_listing_endpoint(listing_data: ListrListingIn, platform: ListrPlatform):
     """
     Push listing to platform with enterprise validation and FlutterFlow compatibility.
     

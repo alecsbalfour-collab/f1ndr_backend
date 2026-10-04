@@ -31,10 +31,14 @@ def test_search_and_intelligence_flow():
 
 
 def test_search_filters_by_category():
-    save_listing({"id": "cat-rv", "title": "Fifth Wheel", "category": "fifth_wheel", "price": 40000})
-    save_listing({"id": "cat-legacy", "title": "Civic", "price": 7500})
+    save_listing({"id": "cat-rv", "title": "Fifth Wheel", "category": "vehicles", "subcategory": "fifth_wheel", "price": 40000})
+    save_listing({"id": "cat-goods", "title": "Sofa", "category": "goods", "price": 300})
+    save_listing({"id": "cat-legacy", "title": "Mystery", "price": 7500})
 
-    assert {r.get("id") for r in run_search({"category": "fifth_wheel"})["results"]} == {"cat-rv"}
-    # Documents stored before `category` existed count as cars.
-    found = {r.get("id") for r in run_search({"category": "car"})["results"]}
+    found = {r.get("id") for r in run_search({"subcategory": "fifth_wheel"})["results"]}
+    assert "cat-rv" in found and "cat-goods" not in found
+    found = {r.get("id") for r in run_search({"category": "vehicles"})["results"]}
+    assert "cat-rv" in found and "cat-goods" not in found
+    # Documents without a category land in "other" rather than guessing vehicles.
+    found = {r.get("id") for r in run_search({"category": "other"})["results"]}
     assert "cat-legacy" in found and "cat-rv" not in found

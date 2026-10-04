@@ -13,6 +13,7 @@ def serialize_listing(listing: Dict[str, Any]) -> Dict[str, Any]:
         "id",
         "vin",
         "category",
+        "subcategory",
         "title",
         "description",
         "make",

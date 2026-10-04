@@ -34,8 +34,11 @@ def seller(headers_for):
         ("post", "/api/v1/sellr/listings", {"title": "Civic", "price": 100, "year": 1700}),
         ("post", "/api/v1/sellr/listings", {"title": "Civic", "price": 100, "$where": "1"}),
         ("post", "/api/v1/sellr/listings", {"title": "Civic", "price": 100, "a.b": 1}),
+        ("post", "/api/v1/sellr/listings", {"title": "Civic", "price": 100}),
         ("post", "/api/v1/sellr/listings", {"title": "Civic", "price": 100, "category": "spaceship"}),
+        ("post", "/api/v1/sellr/listings", {"title": "Civic", "price": 100, "category": "goods", "subcategory": "car"}),
         ("post", "/api/v1/f1ndr/search", {"category": "spaceship"}),
+        ("post", "/api/v1/dealr/inventory", {"name": "Lot"}),
         ("post", "/api/v1/dealr/inventory", {"category": "spaceship"}),
         ("post", "/api/v1/sellr/listings", ["not", "an", "object"]),
         ("post", "/api/v1/f1ndr/vin/decode", {"vin": "TOO-SHORT"}),
@@ -62,7 +65,8 @@ def test_invalid_bodies_are_rejected(client, auth_headers, method, path, body):
 
 
 def test_listing_keeps_extra_fields_but_not_server_managed_ones(client, seller):
-    body = {"title": "Civic", "price": 7500, "color": "red", "features": ["sunroof"],
+    body = {"title": "Civic", "price": 7500, "category": "vehicles", "subcategory": "car",
+            "color": "red", "features": ["sunroof"],
             "id": "chosen-by-client", "created_at": "1999-01-01", "_id": "x"}
     created = client.post("/api/v1/sellr/listings", json=body, headers=seller).json()["data"]
     assert created["color"] == "red" and created["features"] == ["sunroof"]
@@ -71,37 +75,42 @@ def test_listing_keeps_extra_fields_but_not_server_managed_ones(client, seller):
     assert stored["created_at"] != "1999-01-01" and "_id" not in stored
 
 
-def test_category_defaults_to_car_and_filters(client, seller, headers_for):
-    car = client.post("/api/v1/sellr/listings", json={"title": "Civic", "price": 7500}, headers=seller).json()["data"]
-    rv = client.post("/api/v1/sellr/listings", json={"title": "Fifth Wheel", "price": 40000, "category": "fifth_wheel"},
+def test_category_and_subcategory_filter(client, seller, headers_for):
+    couch = client.post("/api/v1/sellr/listings", json={"title": "Sofa", "price": 300, "category": "goods"},
+                        headers=seller).json()["data"]
+    rv = client.post("/api/v1/sellr/listings",
+                     json={"title": "Fifth Wheel", "price": 40000, "category": "vehicles", "subcategory": "fifth_wheel"},
                      headers=seller).json()["data"]
-    assert car["category"] == "car" and rv["category"] == "fifth_wheel"
+    assert couch["category"] == "goods" and rv["category"] == "vehicles" and rv["subcategory"] == "fifth_wheel"
 
-    listed = lambda c: {i["id"] for i in client.get("/api/v1/sellr/listings", params={"category": c}).json()["data"]}
-    assert rv["id"] in listed("fifth_wheel") and car["id"] not in listed("fifth_wheel")
-    assert car["id"] in listed("car") and rv["id"] not in listed("car")
+    listed = lambda **f: {i["id"] for i in client.get("/api/v1/sellr/listings", params=f).json()["data"]}
+    assert rv["id"] in listed(category="vehicles") and couch["id"] not in listed(category="vehicles")
+    assert couch["id"] in listed(category="goods") and rv["id"] in listed(subcategory="fifth_wheel")
+    assert rv["id"] not in listed(subcategory="car")
 
-    # Explicit null and invalid categories behave like omitting the field / a bad value.
+    # A null category on update is coerced to "other", not stored as null.
     cleared = client.put(f"/api/v1/sellr/listings/{rv['id']}", json={"category": None}, headers=seller).json()["data"]
-    assert cleared["category"] == "car"
+    assert cleared["category"] == "other"
 
     dealer = headers_for("dealer", sub="cat-dealer")
-    item = client.post("/api/v1/dealr/inventory", json={"name": "Lot", "category": "motorcycle"}, headers=dealer).json()["data"]
-    assert item["category"] == "motorcycle"
-    ids = {i["id"] for i in client.get("/api/v1/dealr/inventory", params={"category": "motorcycle"}, headers=dealer).json()["data"]}
+    item = client.post("/api/v1/dealr/inventory",
+                       json={"name": "Lot", "category": "vehicles", "subcategory": "motorcycle"},
+                       headers=dealer).json()["data"]
+    ids = {i["id"] for i in client.get("/api/v1/dealr/inventory", params={"subcategory": "motorcycle"}, headers=dealer).json()["data"]}
     assert item["id"] in ids
-    ids = {i["id"] for i in client.get("/api/v1/dealr/inventory", params={"category": "truck"}, headers=dealer).json()["data"]}
+    ids = {i["id"] for i in client.get("/api/v1/dealr/inventory", params={"category": "goods"}, headers=dealer).json()["data"]}
     assert item["id"] not in ids
 
-    seeded = client.post("/api/v1/f1ndr/intelligence", json={"title": "Toy Hauler X1", "price": 30000, "category": "toy_hauler"},
+    seeded = client.post("/api/v1/f1ndr/intelligence",
+                         json={"title": "Toy Hauler X1", "price": 30000, "category": "vehicles", "subcategory": "toy_hauler"},
                          headers=seller)
     assert seeded.status_code == 200
-    titles = lambda c: {r["title"] for r in client.post("/api/v1/f1ndr/search", json={"category": c}).json()["data"]["results"]}
-    assert "Toy Hauler X1" in titles("toy_hauler") and "Toy Hauler X1" not in titles("car")
+    titles = lambda **f: {r["title"] for r in client.post("/api/v1/f1ndr/search", json=f).json()["data"]["results"]}
+    assert "Toy Hauler X1" in titles(subcategory="toy_hauler") and "Toy Hauler X1" not in titles(category="goods")
 
 
 def test_partial_update_only_touches_sent_fields(client, seller):
-    created = client.post("/api/v1/sellr/listings", json={"title": "Civic", "price": 7500, "make": "Honda"}, headers=seller).json()["data"]
+    created = client.post("/api/v1/sellr/listings", json={"title": "Civic", "price": 7500, "make": "Honda", "category": "vehicles"}, headers=seller).json()["data"]
     updated = client.put(f"/api/v1/sellr/listings/{created['id']}", json={"price": 7000, "created_at": "1999-01-01"}, headers=seller).json()["data"]
     assert updated["price"] == 7000 and updated["make"] == "Honda" and updated["title"] == "Civic"
     assert updated["created_at"] != "1999-01-01"

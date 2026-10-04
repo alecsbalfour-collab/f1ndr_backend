@@ -57,13 +57,13 @@ def test_entrypoints_import(entrypoint):
         ("get", "/api/v1/trinn/config", None, 200),
         ("post", "/api/v1/trinn/schedule", {"task": "vin", "vin": VIN, "interval": 1}, 200),
         ("get", "/api/v1/sellr/status", None, 200),
-        ("post", "/api/v1/sellr/listings", {"title": "2003 Honda Accord", "price": 5000}, 201),
+        ("post", "/api/v1/sellr/listings", {"title": "2003 Honda Accord", "price": 5000, "category": "vehicles"}, 201),
         ("get", "/api/v1/listr/status", None, 200),
         ("get", "/api/v1/listr/platforms", None, 200),
-        ("post", "/api/v1/listr/listings?platform=kijiji", {"title": "Accord"}, 201),
+        ("post", "/api/v1/listr/listings?platform=kijiji", {"title": "Accord", "category": "vehicles"}, 201),
         ("put", "/api/v1/listr/listings/abc?platform=kijiji", {"title": "Accord"}, 200),
         ("get", "/api/v1/dealr/status", None, 200),
-        ("post", "/api/v1/dealr/inventory", {"name": "Lot A"}, 201),
+        ("post", "/api/v1/dealr/inventory", {"name": "Lot A", "category": "vehicles"}, 201),
         ("put", "/api/v1/dealr/inventory/inv1", {"name": "Lot A"}, 200),
     ],
 )
@@ -77,7 +77,7 @@ def test_endpoints(client, auth_headers, method, path, body, expected):
 
 def test_sellr_listing_crud_roundtrip(client, headers_for):
     seller = headers_for("user", sub="u-crud")
-    created = client.post("/api/v1/sellr/listings", json={"title": "Civic", "price": 7500}, headers=seller).json()["data"]
+    created = client.post("/api/v1/sellr/listings", json={"title": "Civic", "price": 7500, "category": "vehicles"}, headers=seller).json()["data"]
     assert created["user_id"] == "u-crud"
     listing_id = created["id"]
     assert client.get(f"/api/v1/sellr/listings/{listing_id}").json()["data"]["title"] == "Civic"
@@ -88,7 +88,7 @@ def test_sellr_listing_crud_roundtrip(client, headers_for):
 
 
 def test_dealr_inventory_crud_roundtrip(client, auth_headers):
-    created = client.post("/api/v1/dealr/inventory", json={"name": "Lot CRUD", "status": "crud"}, headers=auth_headers).json()["data"]
+    created = client.post("/api/v1/dealr/inventory", json={"name": "Lot CRUD", "status": "crud", "category": "vehicles"}, headers=auth_headers).json()["data"]
     assert client.get("/api/v1/dealr/inventory?status=crud", headers=auth_headers).json()["pagination"]["total"] == 1
     assert client.delete(f"/api/v1/dealr/inventory/{created['id']}", headers=auth_headers).json()["success"] is True
     assert client.delete(f"/api/v1/dealr/inventory/{created['id']}", headers=auth_headers).json()["success"] is False
@@ -155,5 +155,5 @@ def test_cors_production_origins(monkeypatch):
 
 
 def test_sellr_keeps_price_when_market_value_unknown(client, auth_headers):
-    response = client.post("/api/v1/sellr/listings", json={"title": "Civic", "price": 7500}, headers=auth_headers)
+    response = client.post("/api/v1/sellr/listings", json={"title": "Civic", "price": 7500, "category": "vehicles"}, headers=auth_headers)
     assert response.json()["data"]["price"] == 7500

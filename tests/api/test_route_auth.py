@@ -86,7 +86,7 @@ def test_owner_comes_from_token_not_body(client, headers_for):
 
 def test_sellers_cannot_touch_each_others_listings(client, headers_for):
     alice, bob = headers_for("user", sub="alice"), headers_for("user", sub="bob")
-    listing = client.post(f"{API_V1_PREFIX}/sellr/listings", json={"title": "Civic", "price": 1}, headers=alice).json()["data"]
+    listing = client.post(f"{API_V1_PREFIX}/sellr/listings", json={"title": "Civic", "price": 1, "category": "vehicles"}, headers=alice).json()["data"]
     url = f"{API_V1_PREFIX}/sellr/listings/{listing['id']}"
     assert client.put(url, json={"price": 2}, headers=bob).status_code == 404
     assert client.delete(url, headers=bob).status_code == 404
@@ -96,7 +96,7 @@ def test_sellers_cannot_touch_each_others_listings(client, headers_for):
 
 def test_dealers_only_see_their_own_inventory(client, headers_for):
     d1, d2 = headers_for("dealer", sub="dealer-1"), headers_for("dealer", sub="dealer-2")
-    item = client.post(f"{API_V1_PREFIX}/dealr/inventory", json={"name": "Lot", "status": "iso"}, headers=d1).json()["data"]
+    item = client.post(f"{API_V1_PREFIX}/dealr/inventory", json={"name": "Lot", "status": "iso", "category": "vehicles"}, headers=d1).json()["data"]
     assert item["owner_id"] == "dealer-1"
     listed = lambda h: [i["id"] for i in client.get(f"{API_V1_PREFIX}/dealr/inventory?status=iso", headers=h).json()["data"]]
     assert item["id"] in listed(d1) and item["id"] not in listed(d2)

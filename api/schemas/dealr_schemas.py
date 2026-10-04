@@ -4,7 +4,7 @@ from typing import ClassVar, FrozenSet, Optional
 
 from pydantic import Field
 
-from api.schemas.list_schemas import VehicleIn, VehicleOut
+from api.schemas.list_schemas import Category, VehicleIn, VehicleOut
 
 
 class InventoryIn(VehicleIn):
@@ -12,6 +12,10 @@ class InventoryIn(VehicleIn):
     server_fields: ClassVar[FrozenSet[str]] = frozenset({"owner_id"})
     name: Optional[str] = Field(None, max_length=200)
     status: Optional[str] = Field(None, max_length=50)
+
+
+class InventoryCreate(InventoryIn):
+    category: Category
 
 
 class InventoryItem(VehicleOut):

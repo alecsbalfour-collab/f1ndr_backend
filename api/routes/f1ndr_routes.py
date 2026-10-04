@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from api.dependencies.auth import require_user
 from typing import Optional
 from api.schemas.common import VIN, Envelope, ModuleStatus, Page, ok, paged
-from api.schemas.list_schemas import VehicleCategory, VehicleIn, VehicleOut
+from api.schemas.list_schemas import Category, Subcategory, VehicleIn, VehicleOut
 from api.schemas.search_schema import IntelligenceResult, MarketValue, SearchRequest, SearchResults, VinDecodeRequest, VinDecodeResult
 from f1ndr.vin.decode import decode_vin
 from f1ndr.config.config import get_f1ndr_config
@@ -66,7 +66,8 @@ async def decode_vin_endpoint(vin_data: VinDecodeRequest):
 async def get_vehicles(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    category: Optional[VehicleCategory] = None,
+    category: Optional[Category] = None,
+    subcategory: Optional[Subcategory] = None,
     make: Optional[str] = None,
     model: Optional[str] = None,
     year: Optional[int] = None
@@ -77,7 +78,8 @@ async def get_vehicles(
     Args:
         page: Page number (default: 1)
         page_size: Number of results per page (default: 20)
-        category: Optional vehicle category filter
+        category: Optional classifieds category filter
+        subcategory: Optional subcategory filter
         make: Optional make filter
         model: Optional model filter
         year: Optional year filter
@@ -85,7 +87,7 @@ async def get_vehicles(
     Returns:
         FlutterFlow-compatible paginated response
     """
-    logger.info(f"Getting vehicles - page: {page}, category: {category}, make: {make}, model: {model}, year: {year}")
+    logger.info(f"Getting vehicles - page: {page}, category: {category}, subcategory: {subcategory}, make: {make}, model: {model}, year: {year}")
     
     # TODO: Implement actual database query
     results = []

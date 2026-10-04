@@ -54,7 +54,7 @@ Work one session per group; tick items off here as they land. Keep each group to
 Priority order of open groups: Before tester release -> Session 3+ (observability first, Sentry helps testers) -> dealr RVs & towables -> Pricing -> Auth expansion (A2-A5 wait on provider accounts).
 
 ### Before tester release (next)
-- [x] Vehicle `category` on inventory, sellr/listr listings and search filters (`car`, `truck`, `motorcycle`, `motorhome_a`, `motorhome_b`, `motorhome_c`, `travel_trailer`, `fifth_wheel`, `toy_hauler`, `truck_camper`, `other`). Must land before testers create data; adding it later needs a data migration. Default existing docs to `car` in a migration.
+- [x] Two-level classification on inventory, sellr/listr listings and search filters: `category` (classifieds vertical: `vehicles`, `real_estate`, `goods`, `services`, `jobs`, `pets`, `community`, `other`; required on create) + `subcategory` (`car`, `truck`, `motorcycle`, `motorhome_a/b/c`, `travel_trailer`, `fifth_wheel`, `toy_hauler`, `truck_camper`, `other`; vehicle kinds only for now). Migration 0003 moves existing docs to `vehicles` + old value as `subcategory` (`car` when absent).
 - [ ] Replace placeholders testers will hit: watchr alerts/subscriptions persisted per user (list/delete real), f1ndr `/vehicles` and `/listings/*` querying stored listings, market value returns `null` (not `0`) until Pricing lands so clients don't show $0.
 - [ ] Scheduled trinn tasks never run (see Session 2 note): decide on an in-process stopgap (start the scheduler in the lifespan while `WORKERS=1`) or wait for ARQ.
 - [ ] A1 Password reset, pulled forward from Auth expansion: testers will forget passwords.
@@ -91,9 +91,9 @@ Priority order of open groups: Before tester release -> Session 3+ (observabilit
 - [ ] CI: ruff, mypy, pip-audit/bandit, coverage threshold, image build, pinned deps / lock file (`pyproject.toml` deps empty).
 - [ ] Resilience: timeouts on all outbound calls, graceful shutdown draining scraper jobs.
 
-### dealr: RVs & towables (needs `category` from Before tester release)
-- [ ] R1 Category-specific typed fields, validated per category (discriminated on `category`): length, dry weight, GVWR, sleeps, slide-outs, hitch type, fresh/grey/black tank sizes; mileage, engine and chassis only for motorized units. Towables may have short/odd VINs (already allowed by `LooseVIN`). VIN decode gives the type/chassis only; floorplan details are entered manually.
-- [ ] R2 Search/filter by category and RV attributes (f1ndr search, sellr listings, dealr inventory); regenerate the FlutterFlow client.
+### dealr: RVs & towables (needs the category/subcategory model)
+- [ ] R1 Vehicle-specific typed fields, validated per subcategory (discriminated on `subcategory` within `category=vehicles`): length, dry weight, GVWR, sleeps, slide-outs, hitch type, fresh/grey/black tank sizes; mileage, engine and chassis only for motorized units. Towables may have short/odd VINs (already allowed by `LooseVIN`). VIN decode gives the type/chassis only; floorplan details are entered manually.
+- [ ] R2 Search/filter by category/subcategory and RV attributes (f1ndr search, sellr listings, dealr inventory); regenerate the FlutterFlow client.
 - [ ] R3 Marketplace categories in listr and scrapers (Kijiji/Facebook/AutoTrader RV sections; add RVTrader as a platform).
 
 ### Pricing (after R1: comps must match within a category)

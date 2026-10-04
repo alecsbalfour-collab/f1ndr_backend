@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field, model_validator
 
 from api.schemas.common import VIN, Record
-from api.schemas.list_schemas import VehicleCategory, VehicleOut
+from api.schemas.list_schemas import Category, Subcategory, VehicleOut
 
 
 class VinDecodeRequest(BaseModel):
@@ -26,7 +26,8 @@ class VinDecodeResult(Record):
 
 
 class SearchRequest(BaseModel):
-    category: Optional[VehicleCategory] = None
+    category: Optional[Category] = None
+    subcategory: Optional[Subcategory] = None
     make: Optional[str] = Field(None, max_length=100)
     model: Optional[str] = Field(None, max_length=100)
     year_min: Optional[int] = Field(None, ge=1886, le=2100)

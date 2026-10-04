@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from typing import Any, Dict, Optional
 from api.dependencies.auth import owns, require_scopes
 from api.schemas.common import Envelope, ModuleStatus, Page, error_responses, ok, paged
-from api.schemas.list_schemas import VehicleCategory
+from api.schemas.list_schemas import Category, Subcategory
 from api.schemas.sell_schemas import SellListing, SellListingCreate, SellListingUpdate
 from utils.response_builder import error_response
 from sellr.config.config import get_listings_config
@@ -93,7 +93,8 @@ async def get_listings(
     user_id: Optional[str] = None,
     status: Optional[str] = None,
     platform: Optional[str] = None,
-    category: Optional[VehicleCategory] = None
+    category: Optional[Category] = None,
+    subcategory: Optional[Subcategory] = None
 ):
     """
     Get listings with FlutterFlow-compatible pagination and filtering.
@@ -104,15 +105,21 @@ async def get_listings(
         user_id: Optional user ID filter
         status: Optional status filter
         platform: Optional platform filter
-        category: Optional vehicle category filter
+        category: Optional classifieds category filter
+        subcategory: Optional subcategory filter
         
     Returns:
         FlutterFlow-compatible paginated response
     """
-    logger.info(f"Getting listings - page: {page}, user_id: {user_id}, status: {status}, category: {category}")
+    logger.info(
+        f"Getting listings - page: {page}, user_id: {user_id}, status: {status}, "
+        f"category: {category}, subcategory: {subcategory}"
+    )
 
     result = await list_listings(
-        {"user_id": user_id, "status": status, "platform": platform, "category": category}, page, page_size
+        {"user_id": user_id, "status": status, "platform": platform,
+         "category": category, "subcategory": subcategory},
+        page, page_size,
     )
     return paged(result["listings"], result["total"], page, page_size, "Listings retrieved")
 

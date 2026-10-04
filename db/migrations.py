@@ -51,9 +51,29 @@ async def _vehicle_category_default(db: AsyncIOMotorDatabase) -> None:
         await db[name].update_many({"category": None}, {"$set": {"category": "car"}})
 
 
+async def _category_verticals(db: AsyncIOMotorDatabase) -> None:
+    """Split `category` into a classifieds vertical + a vehicle subcategory.
+
+    Listings predate non-vehicle support, so every document holding a vehicle-kind
+    category (or none) moves to `category: "vehicles"` and keeps the old value as
+    `subcategory` (`"car"` when it was missing).
+    """
+    vehicle_kinds = [
+        "car", "truck", "motorcycle", "motorhome_a", "motorhome_b", "motorhome_c",
+        "travel_trailer", "fifth_wheel", "toy_hauler", "truck_camper", "other",
+        None,  # missing or explicit-null
+    ]
+    for name in ("dealr_inventory", "sellr_listings", "listr_listings"):
+        await db[name].update_many(
+            {"category": {"$in": vehicle_kinds}},
+            [{"$set": {"subcategory": {"$ifNull": ["$category", "car"]}, "category": "vehicles"}}],
+        )
+
+
 MIGRATIONS: List[Migration] = [
     Migration(1, "baseline", _baseline),
     Migration(2, "vehicle_category_default", _vehicle_category_default),
+    Migration(3, "category_verticals", _category_verticals),
 ]
 
 

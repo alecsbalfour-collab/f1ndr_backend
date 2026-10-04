@@ -4,7 +4,7 @@ from typing import ClassVar, FrozenSet, Optional
 
 from pydantic import Field
 
-from api.schemas.list_schemas import VehicleIn, VehicleOut
+from api.schemas.list_schemas import Category, VehicleIn, VehicleOut
 
 
 class SellListingUpdate(VehicleIn):
@@ -17,6 +17,7 @@ class SellListingUpdate(VehicleIn):
 class SellListingCreate(SellListingUpdate):
     title: str = Field(..., min_length=1, max_length=500)
     price: float = Field(..., ge=0)
+    category: Category
 
 
 class SellListing(VehicleOut):

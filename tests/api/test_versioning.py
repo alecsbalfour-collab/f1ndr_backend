@@ -36,7 +36,7 @@ def test_legacy_error_responses_are_also_marked(client, headers_for):
 
 
 def test_legacy_write_roundtrips_with_v1(client, headers_for):
-    created = client.post("/sellr/listings", json={"title": "Civic", "price": 7500}, headers=headers_for()).json()["data"]
+    created = client.post("/sellr/listings", json={"title": "Civic", "price": 7500, "category": "vehicles"}, headers=headers_for()).json()["data"]
     assert client.get(f"/api/v1/sellr/listings/{created['id']}").json()["data"]["title"] == "Civic"
 
 
