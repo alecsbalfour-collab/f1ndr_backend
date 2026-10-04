@@ -9,6 +9,7 @@ from scrapers.base_scraper import BaseScraper
 
 class RentalsScraper(BaseScraper):
     source_name = "rentals_ca"
+    default_category = "real_estate"
     base_url = "https://rentals.ca/calgary"
     search_url = "https://rentals.ca/{query}"
     card_selector = "div.listing-card, article.listing-card"

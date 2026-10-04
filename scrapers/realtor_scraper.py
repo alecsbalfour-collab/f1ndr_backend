@@ -10,6 +10,7 @@ from scrapers.base_scraper import BaseScraper
 
 class RealtorScraper(BaseScraper):
     source_name = "realtor"
+    default_category = "real_estate"
     base_url = "https://www.realtor.ca/ab/calgary/real-estate"
     search_url = "https://www.realtor.ca/ab/{query}/real-estate"
     card_selector = "div.cardCon, [data-testid='listing-card']"

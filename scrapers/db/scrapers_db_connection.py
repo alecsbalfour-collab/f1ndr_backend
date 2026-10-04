@@ -1,12 +1,20 @@
 # scrapers/db/scrapers_db_connection.py
 
 import motor.motor_asyncio
-import os
+
 
 def get_scrapers_db():
     """
-    Return MongoDB connection for scraper modules.
+    Return a database handle for scraper modules.
+
+    When the API is running this is the shared connection's database
+    (db/connection_db). Standalone callers/tests get their own client on the
+    configured URI so this function never silently targets localhost.
     """
-    mongo_uri = os.getenv("f1ndr_MONGO_URI", "mongodb://localhost:27017")
-    client = motor.motor_asyncio.AsyncIOMotorClient(mongo_uri)
-    return client["f1ndr_scrapers"]
+    from api.config.settings_config import get_settings
+    from db.connection_db import get_database
+
+    database = get_database()
+    if database is not None:
+        return database
+    return motor.motor_asyncio.AsyncIOMotorClient(get_settings().MONGODB_URI)["f1ndr_scrapers"]

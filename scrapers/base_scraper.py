@@ -20,6 +20,7 @@ from urllib.parse import quote, quote_plus, urljoin
 from bs4 import BeautifulSoup, Tag
 from playwright.async_api import async_playwright
 
+from f1ndr.db.db import save_scraped_listings
 from scrapers.config.settings_config import ScraperConfig
 from scrapers.core.metrics_core import metrics_registry
 from scrapers.core.normalization_core import parse_price
@@ -54,6 +55,10 @@ class BaseScraper:
     link_selector: str = "a[href]"
     fields: Dict[str, str] = {}
     slug_query: bool = False
+    # Corpus metadata stamped on persisted listings. Region is the market the
+    # scraper targets; URLs are Calgary-baked today (multi-region is a roadmap item).
+    region: str = "calgary"
+    default_category: str = "other"
 
     def __init__(self, config: Optional[ScraperConfig] = None):
         self.config = config or ScraperConfig.from_env()
@@ -209,6 +214,18 @@ class BaseScraper:
         result = self._result(query, url, started, listings=listings)
         self.metrics.record_success(result["duration_ms"], result["count"])
         logger.info("%s: %d listings in %.0fms", self.source_name, result["count"], result["duration_ms"])
+
+        # Persist into the f1ndr corpus; a persistence failure must not fail the scrape.
+        if listings:
+            try:
+                await save_scraped_listings(
+                    listings,
+                    platform=self.source_name,
+                    category=self.default_category,
+                    region=self.region,
+                )
+            except Exception as e:
+                logger.warning("%s: could not persist scraped listings: %s", self.source_name, e)
         if self.config.cache_ttl_seconds:
             await cache_set(cache_key, result, ttl=self.config.cache_ttl_seconds)
         return result

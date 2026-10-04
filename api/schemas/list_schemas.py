@@ -61,6 +61,15 @@ class VehicleOut(Record):
     mileage: Optional[int] = None
     location: Optional[str] = None
     market_value: Optional[float] = None
+    # Corpus/scrape metadata (present on scraped listings and pushed copies).
+    platform: Optional[str] = None
+    region: Optional[str] = None
+    url: Optional[str] = None
+    image: Optional[str] = None
+    price_text: Optional[str] = None
+    posted: Optional[str] = None
+    scraped_at: Optional[str] = None
+    first_seen_at: Optional[str] = None
 
 
 class ListrListing(VehicleOut):

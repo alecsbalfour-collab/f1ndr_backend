@@ -11,6 +11,7 @@ _SEARCH = "https://www.autotrader.ca/cars/ab/calgary/?rcp=100&srt=35&prx=100&prv
 
 class AutotraderScraper(BaseScraper):
     source_name = "autotrader"
+    default_category = "vehicles"
     base_url = _SEARCH
     search_url = _SEARCH + "&kwd={query}"
     card_selector = "div.result-item, [data-testid='search-listing-card']"

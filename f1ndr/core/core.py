@@ -17,7 +17,8 @@ from f1ndr.utils.utils import (
 async def run_search(params: dict) -> dict:
     """
     Perform a search over stored listings using simple filters.
-    params may include: category, subcategory, make, model, year_min, year_max, price_min, price_max, text.
+    params may include: category, subcategory, make, model, year_min, year_max,
+    price_min, price_max, text, region, location.
     """
     config = get_f1ndr_config()
     listings = await query_listings()
@@ -30,7 +31,9 @@ async def run_search(params: dict) -> dict:
     year_max = params.get("year_max")
     price_min = params.get("price_min")
     price_max = params.get("price_max")
-    text = params.get("text", "").lower().strip()
+    region = params.get("region")
+    location = (params.get("location") or "").lower().strip()
+    text = (params.get("text") or "").lower().strip()
 
     def matches(l: dict) -> bool:
         # Listings without a category/subcategory land in "other" rather than guessing.
@@ -41,6 +44,10 @@ async def run_search(params: dict) -> dict:
         if make and l.get("make") != make:
             return False
         if model and l.get("model") != model:
+            return False
+        if region and (l.get("region") or "") != region:
+            return False
+        if location and location not in str(l.get("location") or "").lower():
             return False
         year = l.get("year")
         if year_min and year and year < year_min:
@@ -60,6 +67,7 @@ async def run_search(params: dict) -> dict:
                     l.get("description", ""),
                     l.get("make", ""),
                     l.get("model", ""),
+                    l.get("location", ""),
                 ]
             )
             if text not in blob:

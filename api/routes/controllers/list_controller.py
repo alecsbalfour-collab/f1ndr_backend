@@ -28,7 +28,9 @@ async def get_unified_listings(
     category: Optional[Category] = None,
     subcategory: Optional[Subcategory] = None,
     min_price: Optional[float] = None,
-    max_price: Optional[float] = None
+    max_price: Optional[float] = None,
+    region: Optional[str] = None,
+    location: Optional[str] = None
 ):
     """
     Get unified listings from all platforms with FlutterFlow-compatible pagination.
@@ -49,7 +51,7 @@ async def get_unified_listings(
 
     # Same listing can exist in several stores (e.g. a sellr listing pushed to kijiji):
     # dedupe by listing id, then apply the text/price filters the stores can't express.
-    query = {k: v for k, v in {"category": category, "subcategory": subcategory}.items() if v}
+    query = {k: v for k, v in {"category": category, "subcategory": subcategory, "region": region}.items() if v}
     seen, docs = set(), []
     for store in (sellr_store, listr_store, f1ndr_store):
         for doc in await store.find(query, limit=10_000):
@@ -61,23 +63,42 @@ async def get_unified_listings(
     if search:
         needle = search.lower()
         docs = [d for d in docs
-                if needle in " ".join(str(d.get(f) or "") for f in ("title", "description", "make", "model")).lower()]
+                if needle in " ".join(str(d.get(f) or "") for f in ("title", "description", "make", "model", "location")).lower()]
+    if location:
+        needle = location.lower()
+        docs = [d for d in docs if needle in str(d.get("location") or "").lower()]
     if min_price is not None:
         docs = [d for d in docs if (d.get("price") or 0) >= min_price]
     if max_price is not None:
         docs = [d for d in docs if (d.get("price") or 0) <= max_price]
 
-    docs.sort(key=lambda d: d.get("created_at") or "", reverse=True)
+    docs.sort(key=lambda d: d.get("scraped_at") or d.get("created_at") or "", reverse=True)
     total = len(docs)
     results = docs[(page - 1) * page_size: page * page_size]
 
     return paged(results, total, page, page_size, "Unified listings retrieved")
 
 
+# Platform spellings differ between listr pushes and scraper source names.
+_PLATFORM_ALIASES = {
+    "facebook": {"facebook", "facebook_marketplace"},
+}
+
+
 async def _raw_platform_listings(platform: str, page: int, page_size: int) -> dict:
-    query = {"platform": platform}
-    results = await listr_store.find(query, skip=(page - 1) * page_size, limit=page_size, sort=("updated_at", -1))
-    total = await listr_store.count(query)
+    # A platform's raw feed is both what listr pushed there and what the scrapers collected.
+    names = _PLATFORM_ALIASES.get(platform, {platform})
+    seen, docs = set(), []
+    for name in names:
+        for store in (listr_store, f1ndr_store):
+            for doc in await store.find({"platform": name}, limit=10_000):
+                key = doc.get("id") or doc.get("key") or id(doc)
+                if key not in seen:
+                    seen.add(key)
+                    docs.append(doc)
+    docs.sort(key=lambda d: d.get("scraped_at") or d.get("updated_at") or "", reverse=True)
+    total = len(docs)
+    results = docs[(page - 1) * page_size: page * page_size]
     return paged(results, total, page, page_size, f"{platform.capitalize()} listings retrieved")
 
 

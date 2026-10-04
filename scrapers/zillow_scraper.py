@@ -9,6 +9,7 @@ from scrapers.base_scraper import BaseScraper
 
 class ZillowScraper(BaseScraper):
     source_name = "zillow"
+    default_category = "real_estate"
     base_url = "https://www.zillow.com/calgary-ab/"
     search_url = "https://www.zillow.com/homes/{query}_rb/"
     card_selector = "article[data-test='property-card'], li article"

@@ -35,6 +35,8 @@ class SearchRequest(BaseModel):
     price_min: Optional[float] = Field(None, ge=0)
     price_max: Optional[float] = Field(None, ge=0)
     text: Optional[str] = Field(None, max_length=200)
+    region: Optional[str] = Field(None, max_length=100)
+    location: Optional[str] = Field(None, max_length=200)
 
     @model_validator(mode="after")
     def _ranges(self) -> "SearchRequest":
