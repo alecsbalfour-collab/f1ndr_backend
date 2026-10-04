@@ -63,7 +63,7 @@ async def _category_verticals(db: AsyncIOMotorDatabase) -> None:
         "travel_trailer", "fifth_wheel", "toy_hauler", "truck_camper", "other",
         None,  # missing or explicit-null
     ]
-    for name in ("dealr_inventory", "sellr_listings", "listr_listings"):
+    for name in ("dealr_inventory", "sellr_listings", "listr_listings", "listings", "f1ndr_listings"):
         await db[name].update_many(
             {"category": {"$in": vehicle_kinds}},
             [{"$set": {"subcategory": {"$ifNull": ["$category", "car"]}, "category": "vehicles"}}],

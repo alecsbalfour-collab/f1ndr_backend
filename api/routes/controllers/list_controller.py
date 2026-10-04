@@ -8,6 +8,9 @@ from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, Query
 from api.schemas.common import Page, paged
 from api.schemas.list_schemas import Category, Subcategory, VehicleOut
+from f1ndr.db.db import listings_store as f1ndr_store
+from listr.db.listing_repo import listings_store as listr_store
+from sellr.utils.utils import listings_store as sellr_store
 from utils.response_builder import success_response, error_response, paginated_response
 
 
@@ -29,25 +32,53 @@ async def get_unified_listings(
 ):
     """
     Get unified listings from all platforms with FlutterFlow-compatible pagination.
-    
+
     Args:
         page: Page number (default: 1)
         page_size: Number of results per page (default: 20)
         search: Optional search query
         category: Optional category filter
+        subcategory: Optional subcategory filter
         min_price: Optional minimum price filter
         max_price: Optional maximum price filter
-        
+
     Returns:
         FlutterFlow-compatible paginated response
     """
-    logger.info(f"Getting unified listings - page: {page}, filters: {search}, {category}")
-    
-    # TODO: Implement actual database query with filters
-    results = []
-    total = 0
-    
+    logger.info(f"Getting unified listings - page: {page}, filters: {search}, {category}, {subcategory}")
+
+    # Same listing can exist in several stores (e.g. a sellr listing pushed to kijiji):
+    # dedupe by listing id, then apply the text/price filters the stores can't express.
+    query = {k: v for k, v in {"category": category, "subcategory": subcategory}.items() if v}
+    seen, docs = set(), []
+    for store in (sellr_store, listr_store, f1ndr_store):
+        for doc in await store.find(query, limit=10_000):
+            key = doc.get("id") or doc.get("key") or id(doc)
+            if key not in seen:
+                seen.add(key)
+                docs.append(doc)
+
+    if search:
+        needle = search.lower()
+        docs = [d for d in docs
+                if needle in " ".join(str(d.get(f) or "") for f in ("title", "description", "make", "model")).lower()]
+    if min_price is not None:
+        docs = [d for d in docs if (d.get("price") or 0) >= min_price]
+    if max_price is not None:
+        docs = [d for d in docs if (d.get("price") or 0) <= max_price]
+
+    docs.sort(key=lambda d: d.get("created_at") or "", reverse=True)
+    total = len(docs)
+    results = docs[(page - 1) * page_size: page * page_size]
+
     return paged(results, total, page, page_size, "Unified listings retrieved")
+
+
+async def _raw_platform_listings(platform: str, page: int, page_size: int) -> dict:
+    query = {"platform": platform}
+    results = await listr_store.find(query, skip=(page - 1) * page_size, limit=page_size, sort=("updated_at", -1))
+    total = await listr_store.count(query)
+    return paged(results, total, page, page_size, f"{platform.capitalize()} listings retrieved")
 
 
 @router.get("/raw/facebook", response_model=Page[VehicleOut])
@@ -57,12 +88,7 @@ async def get_raw_facebook_listings(
 ):
     """Get raw Facebook listings with FlutterFlow-compatible pagination."""
     logger.info(f"Getting raw Facebook listings - page: {page}")
-    
-    # TODO: Implement actual Facebook data retrieval
-    results = []
-    total = 0
-    
-    return paged(results, total, page, page_size, "Facebook listings retrieved")
+    return await _raw_platform_listings("facebook", page, page_size)
 
 
 @router.get("/raw/kijiji", response_model=Page[VehicleOut])
@@ -72,12 +98,7 @@ async def get_raw_kijiji_listings(
 ):
     """Get raw Kijiji listings with FlutterFlow-compatible pagination."""
     logger.info(f"Getting raw Kijiji listings - page: {page}")
-    
-    # TODO: Implement actual Kijiji data retrieval
-    results = []
-    total = 0
-    
-    return paged(results, total, page, page_size, "Kijiji listings retrieved")
+    return await _raw_platform_listings("kijiji", page, page_size)
 
 
 @router.get("/raw/craigslist", response_model=Page[VehicleOut])
@@ -87,12 +108,7 @@ async def get_raw_craigslist_listings(
 ):
     """Get raw Craigslist listings with FlutterFlow-compatible pagination."""
     logger.info(f"Getting raw Craigslist listings - page: {page}")
-    
-    # TODO: Implement actual Craigslist data retrieval
-    results = []
-    total = 0
-    
-    return paged(results, total, page, page_size, "Craigslist listings retrieved")
+    return await _raw_platform_listings("craigslist", page, page_size)
 
 
 class ListController:

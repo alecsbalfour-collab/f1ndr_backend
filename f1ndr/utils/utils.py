@@ -2,7 +2,7 @@
 Utility functions for f1ndr.
 """
 
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 import math
 
 
@@ -53,23 +53,12 @@ def decode_vin(vin: str) -> Dict[str, Any]:
     return result
 
 
-def compute_market_value(listing: Dict[str, Any]) -> float:
+def compute_market_value(listing: Dict[str, Any]) -> Optional[float]:
     """
-    Compute a simple market value based on year, mileage, and base price.
+    No pricing provider yet (Pricing roadmap item); None means unknown,
+    so callers must not present it as a real value.
     """
-    base_price = listing.get("price") or 0
-    year = listing.get("year") or 0
-    mileage = listing.get("mileage") or 0
-
-    if not year or not base_price:
-        return float(base_price)
-
-    age = max(0, 2025 - year)
-    age_factor = max(0.4, 1.0 - age * 0.03)
-    mileage_factor = 1.0 - min(0.5, (mileage / 200_000.0))
-
-    value = base_price * age_factor * mileage_factor
-    return round(value, 2)
+    return None
 
 
 def _title_similarity(a: str, b: str) -> float:
@@ -130,7 +119,7 @@ def detect_fraud(
     market_value = compute_market_value(listing)
     price = listing.get("price") or 0
 
-    if market_value <= 0 or price <= 0:
+    if market_value is None or market_value <= 0 or price <= 0:
         return {"score": 0.0, "reason": "insufficient_data"}
 
     ratio = price / market_value

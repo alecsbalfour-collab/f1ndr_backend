@@ -63,6 +63,6 @@ class IntelligenceResult(BaseModel):
 
 class MarketValue(BaseModel):
     vin: str
-    market_value: float
+    market_value: Optional[float] = None
     confidence: float
     mileage: Optional[int] = None

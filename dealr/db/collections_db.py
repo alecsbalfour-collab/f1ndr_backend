@@ -9,10 +9,6 @@ def get_dealers_collection() -> AsyncIOMotorCollection:
     return get_database()["dealers"]
 
 
-def get_listings_collection() -> AsyncIOMotorCollection:
-    return get_database()["listings"]
-
-
 def get_bulk_jobs_collection() -> AsyncIOMotorCollection:
     return get_database()["bulk_vin_jobs"]
 

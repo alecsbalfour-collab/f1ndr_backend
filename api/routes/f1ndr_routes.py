@@ -13,6 +13,7 @@ from api.schemas.search_schema import IntelligenceResult, MarketValue, SearchReq
 from f1ndr.vin.decode import decode_vin
 from f1ndr.config.config import get_f1ndr_config
 from f1ndr.core.core import run_search, run_intelligence
+from f1ndr.db.db import listings_store
 
 
 logger = logging.getLogger(__name__)
@@ -74,7 +75,7 @@ async def get_vehicles(
 ):
     """
     Get vehicles with FlutterFlow-compatible pagination and filtering.
-    
+
     Args:
         page: Page number (default: 1)
         page_size: Number of results per page (default: 20)
@@ -83,28 +84,29 @@ async def get_vehicles(
         make: Optional make filter
         model: Optional model filter
         year: Optional year filter
-        
+
     Returns:
         FlutterFlow-compatible paginated response
     """
     logger.info(f"Getting vehicles - page: {page}, category: {category}, subcategory: {subcategory}, make: {make}, model: {model}, year: {year}")
-    
-    # TODO: Implement actual database query
-    results = []
-    total = 0
-    
+
+    filters = {"category": category, "subcategory": subcategory, "make": make, "model": model, "year": year}
+    query = {k: v for k, v in filters.items() if v is not None}
+    results = await listings_store.find(query, skip=(page - 1) * page_size, limit=page_size)
+    total = await listings_store.count(query)
+
     return paged(results, total, page, page_size, "Vehicles retrieved")
 
 
 @router.post("/search", response_model=Envelope[SearchResults])
 async def search_endpoint(params: SearchRequest):
-    return ok(run_search(params.model_dump(exclude_none=True)), "Search completed")
+    return ok(await run_search(params.model_dump(exclude_none=True)), "Search completed")
 
 
 # Authenticated: the enriched listing is persisted.
 @router.post("/intelligence", response_model=Envelope[IntelligenceResult], dependencies=[Depends(require_user)])
 async def intelligence_endpoint(listing: VehicleIn):
-    return ok(run_intelligence(listing.to_data()), "Intelligence completed")
+    return ok(await run_intelligence(listing.to_data()), "Intelligence completed")
 
 
 @router.get("/market/value", response_model=Envelope[MarketValue])
@@ -120,15 +122,13 @@ async def get_market_value(vin: VIN, mileage: Optional[int] = Query(None, ge=0))
         FlutterFlow-compatible response with market value data
     """
     logger.info(f"Getting market value for VIN: {vin}, mileage: {mileage}")
-    
-    # TODO: Implement actual market value calculation
-    # This would use f1ndr.intelligence.market functions
-    
+
+    # No pricing provider yet (Pricing roadmap item); null so clients don't show $0.
     market_data = {
         "vin": vin,
-        "market_value": 0,
+        "market_value": None,
         "confidence": 0.0,
         "mileage": mileage,
     }
-    
-    return ok(market_data, "Market value calculated")
+
+    return ok(market_data, "Market value unavailable")

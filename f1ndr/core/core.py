@@ -14,13 +14,13 @@ from f1ndr.utils.utils import (
 )
 
 
-def run_search(params: dict) -> dict:
+async def run_search(params: dict) -> dict:
     """
     Perform a search over stored listings using simple filters.
     params may include: category, subcategory, make, model, year_min, year_max, price_min, price_max, text.
     """
     config = get_f1ndr_config()
-    listings = query_listings()
+    listings = await query_listings()
 
     category = params.get("category")
     subcategory = params.get("subcategory")
@@ -77,7 +77,7 @@ def run_search(params: dict) -> dict:
     return {"results": filtered[: config["max_results"]]}
 
 
-def run_intelligence(listing: dict) -> dict:
+async def run_intelligence(listing: dict) -> dict:
     """
     Run VIN decode, market value, duplicate detection, and fraud scoring on a single listing.
     """
@@ -92,7 +92,7 @@ def run_intelligence(listing: dict) -> dict:
         result["market_value"] = compute_market_value(listing)
 
     if config["enable_duplicates"]:
-        all_listings = query_listings()
+        all_listings = await query_listings()
         result["duplicates"] = detect_duplicates(
             listing,
             all_listings,
@@ -109,6 +109,6 @@ def run_intelligence(listing: dict) -> dict:
 
     # Optionally persist enriched listing
     enriched = {**listing, **result}
-    save_listing(enriched)
+    await save_listing(enriched)
 
     return result

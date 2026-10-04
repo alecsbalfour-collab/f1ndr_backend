@@ -1,37 +1,29 @@
 """
 Database layer for f1ndr.
 
-For now, uses an in‑memory store that behaves like a simple collection.
-This is fully functional and can be swapped for a real DB later.
+Listings persist through the shared DocumentStore: Mongo when connected,
+in-memory otherwise (tests, dev without Mongo).
 """
 
-from typing import Dict, List, Any
-from threading import RLock
+import uuid
+from typing import Any, Dict, List
 
-_LISTINGS: List[Dict[str, Any]] = []
-_LOCK = RLock()
+from db.document_store import DocumentStore
 
-
-def save_listing(listing: Dict[str, Any]) -> None:
-    """
-    Insert or update a listing based on its id (if present).
-    """
-    with _LOCK:
-        listing_id = listing.get("id")
-        if listing_id is not None:
-            for idx, existing in enumerate(_LISTINGS):
-                if existing.get("id") == listing_id:
-                    _LISTINGS[idx] = listing
-                    break
-            else:
-                _LISTINGS.append(listing)
-        else:
-            _LISTINGS.append(listing)
+listings_store = DocumentStore("f1ndr_listings", key="id", indexes=("category", "subcategory", "make"))
 
 
-def query_listings() -> List[Dict[str, Any]]:
-    """
-    Return a copy of all stored listings.
-    """
-    with _LOCK:
-        return list(_LISTINGS)
+async def save_listing(listing: Dict[str, Any]) -> str:
+    """Insert or update a listing by its id. Returns the listing id."""
+    listing.setdefault("id", str(uuid.uuid4()))
+    await listings_store.upsert(listing)
+    return listing["id"]
+
+
+async def query_listings(query: Dict[str, Any] = None, limit: int = 10_000) -> List[Dict[str, Any]]:
+    """Listings matching an equality query (all of them by default)."""
+    return await listings_store.find(query or {}, limit=limit)
+
+
+async def count_listings(query: Dict[str, Any] = None) -> int:
+    return await listings_store.count(query or {})

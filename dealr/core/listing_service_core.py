@@ -1,23 +1,42 @@
-from typing import Optional, List, Dict
-from dealr.config import get_settings
+from typing import List, Optional
+
+from db.document_store import DocumentStore
 from dealr.core.errors_core import ForbiddenError, NotFoundError
-from dealr.data.models_data import VehicleListing, VehicleListingCreate
-from dealr.db.collections_db import get_listings_collection
+from dealr.data.models_data import VehicleListing, VehicleListingCreate, VehicleListingUpdate
+
+listings_store = DocumentStore("listings", key="listing_id", indexes=("dealer_id", "vin", "listing_status"))
 
 
 async def get_listing(dealer_id: str, listing_id: str) -> VehicleListing:
-    doc = await get_listings_collection().find_one({"listing_id": listing_id})
+    doc = await listings_store.get(listing_id)
     if not doc:
         raise NotFoundError(f"Listing '{listing_id}' not found.")
     if doc["dealer_id"] != dealer_id:
         raise ForbiddenError("You do not have access to this listing.")
-    return VehicleListing(**{k: v for k, v in doc.items() if k != "_id"})
+    return VehicleListing(**doc)
 
 
 async def create_listing(dealer_id: str, payload: VehicleListingCreate) -> VehicleListing:
     listing = VehicleListing(dealer_id=dealer_id, **payload.model_dump())
-    await get_listings_collection().insert_one(listing.model_dump(mode="json"))
+    await listings_store.upsert(listing.model_dump(mode="json"))
     return listing
+
+
+async def list_dealer_listings(dealer_id: str) -> List[VehicleListing]:
+    docs = await listings_store.find({"dealer_id": dealer_id}, limit=10_000, sort=("created_at", -1))
+    return [VehicleListing(**doc) for doc in docs]
+
+
+async def update_listing(dealer_id: str, listing_id: str, payload: VehicleListingUpdate) -> VehicleListing:
+    listing = await get_listing(dealer_id, listing_id)
+    updated = listing.model_copy(update=payload.model_dump(exclude_unset=True))
+    await listings_store.upsert(updated.model_dump(mode="json"))
+    return updated
+
+
+async def delete_listing(dealer_id: str, listing_id: str) -> bool:
+    await get_listing(dealer_id, listing_id)
+    return await listings_store.delete(listing_id)
 
 
 class ListingService:
@@ -26,58 +45,17 @@ class ListingService:
     Handles listing creation, retrieval, updates, and deletion.
     """
 
-    def __init__(self):
-        self.settings = get_settings()
+    async def get_listings(self, dealer_id: str) -> List[VehicleListing]:
+        return await list_dealer_listings(dealer_id)
 
-    # Example: get all listings for a dealer
-    async def get_listings(self, dealer_id: str) -> List[Dict]:
-        # Replace with real DB lookup
-        return [
-            {
-                "listing_id": "L001",
-                "dealer_id": dealer_id,
-                "vin": "1HGCM82633A123456",
-                "price": 12999,
-                "status": "active"
-            },
-            {
-                "listing_id": "L002",
-                "dealer_id": dealer_id,
-                "vin": "2C4RC1BG7HR123789",
-                "price": 18999,
-                "status": "pending"
-            }
-        ]
+    async def get_listing(self, dealer_id: str, listing_id: str) -> VehicleListing:
+        return await get_listing(dealer_id, listing_id)
 
-    # Example: get a single listing
-    async def get_listing(self, listing_id: str) -> Optional[Dict]:
-        # Replace with real DB lookup
-        return {
-            "listing_id": listing_id,
-            "dealer_id": "123",
-            "vin": "1HGCM82633A123456",
-            "price": 12999,
-            "status": "active"
-        }
+    async def create_listing(self, dealer_id: str, payload: VehicleListingCreate) -> VehicleListing:
+        return await create_listing(dealer_id, payload)
 
-    # Example: create a listing
-    async def create_listing(self, dealer_id: str, data: Dict) -> Dict:
-        # Replace with real DB insert
-        return {
-            "listing_id": "NEW123",
-            "dealer_id": dealer_id,
-            **data
-        }
+    async def update_listing(self, dealer_id: str, listing_id: str, payload: VehicleListingUpdate) -> VehicleListing:
+        return await update_listing(dealer_id, listing_id, payload)
 
-    # Example: update a listing
-    async def update_listing(self, listing_id: str, data: Dict) -> Dict:
-        # Replace with real DB update
-        return {
-            "listing_id": listing_id,
-            **data
-        }
-
-    # Example: delete a listing
-    async def delete_listing(self, listing_id: str) -> bool:
-        # Replace with real DB delete
-        return True
+    async def delete_listing(self, dealer_id: str, listing_id: str) -> bool:
+        return await delete_listing(dealer_id, listing_id)

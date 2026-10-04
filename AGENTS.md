@@ -55,7 +55,7 @@ Priority order of open groups: Before tester release -> Session 3+ (observabilit
 
 ### Before tester release (next)
 - [x] Two-level classification on inventory, sellr/listr listings and search filters: `category` (classifieds vertical: `vehicles`, `real_estate`, `goods`, `services`, `jobs`, `pets`, `community`, `other`; required on create) + `subcategory` (`car`, `truck`, `motorcycle`, `motorhome_a/b/c`, `travel_trailer`, `fifth_wheel`, `toy_hauler`, `truck_camper`, `other`; vehicle kinds only for now). Migration 0003 moves existing docs to `vehicles` + old value as `subcategory` (`car` when absent).
-- [ ] Replace placeholders testers will hit: watchr alerts/subscriptions persisted per user (list/delete real), f1ndr `/vehicles` and `/listings/*` querying stored listings, market value returns `null` (not `0`) until Pricing lands so clients don't show $0.
+- [x] Replace placeholders testers will hit: watchr alerts/subscriptions persisted per user (list/delete real), f1ndr `/vehicles` and `/listings/*` querying stored listings, market value returns `null` (not `0`) until Pricing lands so clients don't show $0. Also moved f1ndr listings off the in-memory list and dealr's `listing_service_core` off raw Motor — both now use `DocumentStore`; watchr gained the module contract (`run` + `get_watchr_config`).
 - [ ] Scheduled trinn tasks never run (see Session 2 note): decide on an in-process stopgap (start the scheduler in the lifespan while `WORKERS=1`) or wait for ARQ.
 - [ ] A1 Password reset, pulled forward from Auth expansion: testers will forget passwords.
 
@@ -97,7 +97,7 @@ Priority order of open groups: Before tester release -> Session 3+ (observabilit
 - [ ] R3 Marketplace categories in listr and scrapers (Kijiji/Facebook/AutoTrader RV sections; add RVTrader as a platform).
 
 ### Pricing (after R1: comps must match within a category)
-- [ ] P1 One pricing provider interface in `f1ndr/intelligence/market.py` replacing both `compute_market_value` stubs (`f1ndr/intelligence/market.py` returns 0.0; `f1ndr/utils/utils.py` only discounts the listing's own price). dealr ingest and sellr auto-pricing use it.
+- [ ] P1 One pricing provider interface in `f1ndr/intelligence/market.py` replacing both `compute_market_value` stubs (both return `None` for now). dealr ingest and sellr auto-pricing use it.
 - [ ] P2 Local market comps: persist scraped listings with location + category, add a location to dealer accounts, match year/make/model/trim within a mileage band and radius; return median, p25/p75, comp count, confidence. Asking prices, not sold prices; check marketplace terms before commercial use.
 - [ ] P3 Book values behind config flags: Canadian Black Book for cars/trucks (confirm whether its specialty valuations cover RVs) and an RV guide (e.g. J.D. Power) for RVs. Needs commercial agreements (`docs/ACCOUNTS_SETUP.md`).
 - [ ] P4 dealr pricing panel endpoint: book values + local comps + suggested price range.
