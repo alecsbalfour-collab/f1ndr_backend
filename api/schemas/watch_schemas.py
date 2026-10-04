@@ -67,3 +67,5 @@ class MatchOut(Record):
     listing: Optional[Dict[str, Any]] = None
     matched_at: Optional[str] = None
     notified: Optional[bool] = None
+    previous_price: Optional[float] = None
+    price_dropped_at: Optional[str] = None

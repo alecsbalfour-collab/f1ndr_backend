@@ -179,6 +179,57 @@ async def test_alert_matches_on_ingest_and_dedupes(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_price_drop_renotifies(monkeypatch):
+    from watchr.core import core as watchr_core
+
+    watchr_core.alerts_store.clear_memory()
+    watchr_core.matches_store.clear_memory()
+
+    sent = []
+
+    async def fake_user(user_id):
+        return {"user_id": user_id, "email": f"{user_id}@example.com"}
+
+    async def fake_send(to, subject, body):
+        sent.append((to, subject))
+        return True
+
+    monkeypatch.setattr("api.auth.accounts.get_user", fake_user)
+    monkeypatch.setattr("api.auth.email.send_email", fake_send)
+
+    await watchr_core.create_alert({"name": "Civics", "query": "civic", "user_id": "u-price"})
+
+    await save_scraped_listings(
+        [{"title": "Honda Civic", "price_value": 18500.0, "url": KIJIJI_URL}], platform="kijiji"
+    )
+    assert await watchr_core.evaluate_listings(
+        await listings_store.find({"platform": "kijiji"})
+    ) == 1
+
+    # Same listing re-scraped cheaper -> price-drop email, record updated.
+    await save_scraped_listings(
+        [{"title": "Honda Civic", "price_value": 16000.0, "url": KIJIJI_URL}], platform="kijiji"
+    )
+    assert await watchr_core.evaluate_listings(
+        await listings_store.find({"platform": "kijiji"})
+    ) == 0
+    assert sent[-1] == ("u-price@example.com", "f1ndr price drop: Honda Civic")
+
+    record = await watchr_core.matches_store.get(
+        (await watchr_core.matches_store.find({"user_id": "u-price"}))[0]["id"]
+    )
+    assert record["previous_price"] == 18500.0
+    assert record["listing"]["price"] == 16000.0
+    assert record["price_dropped_at"]
+
+    # Same price again -> no notification.
+    assert await watchr_core.evaluate_listings(
+        await listings_store.find({"platform": "kijiji"})
+    ) == 0
+    assert len(sent) == 2
+
+
+@pytest.mark.asyncio
 async def test_matches_route_scoped_to_user(client, headers_for):
     from watchr.core import core as watchr_core
 
