@@ -15,3 +15,4 @@ limiter = Limiter(
 # Strict per-route limits for brute-force targets
 LOGIN_RATE_LIMIT = "5/minute;20/hour"
 REGISTER_RATE_LIMIT = "3/minute;10/hour"
+PASSWORD_RESET_RATE_LIMIT = "3/minute;10/hour"

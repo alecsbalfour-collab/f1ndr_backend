@@ -33,6 +33,7 @@ class AuthConfig:
     # User management
     require_email_verification: bool = True
     email_verification_expiry_hours: int = 24
+    password_reset_expiry_minutes: int = 60
     password_min_length: int = 8
     password_require_uppercase: bool = True
     password_require_lowercase: bool = True
@@ -56,6 +57,7 @@ class AuthConfig:
         
         # Override with environment variables if available
         self.secret_key = os.getenv("JWT_SECRET_KEY", self.secret_key)
+        self.password_reset_expiry_minutes = int(os.getenv("PASSWORD_RESET_EXPIRY_MINUTES", str(self.password_reset_expiry_minutes)))
         self.token_expiry_minutes = int(os.getenv("TOKEN_EXPIRY_MINUTES", str(self.token_expiry_minutes)))
         self.refresh_token_expiry_days = int(os.getenv("REFRESH_TOKEN_EXPIRY_DAYS", str(self.refresh_token_expiry_days)))
         self.max_login_attempts = int(os.getenv("MAX_LOGIN_ATTEMPTS", str(self.max_login_attempts)))

@@ -106,33 +106,66 @@ def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-async def create_email_verification_token(user: dict) -> str:
-    """Issue a single-use token (only its hash is stored); older tokens for the user are dropped."""
-    for old in await store.email_tokens.find({"user_id": user["user_id"]}, limit=100):
+async def _issue_email_token(user: dict, purpose: str, lifetime: timedelta) -> str:
+    """Issue a single-use token (only its hash is stored); older ones for the same purpose are dropped."""
+    for old in await store.email_tokens.find({"user_id": user["user_id"], "purpose": purpose}, limit=100):
         await store.email_tokens.delete(old["token_hash"])
     token = secrets.token_urlsafe(32)
     await store.email_tokens.upsert({
         "token_hash": _hash_token(token),
         "user_id": user["user_id"],
         "email": user["email"],
-        "purpose": "verify_email",
+        "purpose": purpose,
         "created_at": store.utcnow(),
-        "expires_at": store.utcnow() + timedelta(hours=auth_config.email_verification_expiry_hours),
+        "expires_at": store.utcnow() + lifetime,
     })
     return token
 
 
-async def verify_email_token(token: str) -> Optional[dict]:
-    """Consume a verification token; returns the updated user, or None if invalid/expired."""
+async def _take_email_token(token: str, purpose: str) -> Optional[dict]:
+    """Consume (single-use) an email token for `purpose`; returns its record or None."""
     token_hash = _hash_token(token)
     record = await store.email_tokens.get(token_hash)
-    if record is None or not await store.email_tokens.delete(token_hash):
+    # Records without a purpose predate the field; they were all verification tokens.
+    if record is None or (record.get("purpose") or "verify_email") != purpose:
+        return None
+    await store.email_tokens.delete(token_hash)
+    if record["expires_at"] < store.utcnow():
+        return None
+    return record
+
+
+async def create_email_verification_token(user: dict) -> str:
+    return await _issue_email_token(user, "verify_email", timedelta(hours=auth_config.email_verification_expiry_hours))
+
+
+async def verify_email_token(token: str) -> Optional[dict]:
+    """Consume a verification token; returns the updated user, or None if invalid/expired."""
+    record = await _take_email_token(token, "verify_email")
+    if record is None:
         return None
     user = await get_user(record["user_id"])
-    if record["expires_at"] < store.utcnow() or user is None or user["email"] != record["email"]:
+    if user is None or user["email"] != record["email"]:
         return None
     roles = user.get("roles", [])
     if user["email"] in get_settings().admin_emails and "admin" not in roles:
         roles = roles + ["admin"]
     await store.users.update(user["user_id"], {"email_verified": True, "email_verified_at": store.utcnow(), "roles": roles})
     return await get_user(user["user_id"])
+
+
+async def create_password_reset_token(user: dict) -> str:
+    return await _issue_email_token(user, "password_reset", timedelta(minutes=auth_config.password_reset_expiry_minutes))
+
+
+async def consume_password_reset_token(token: str) -> Optional[dict]:
+    """Consume a reset token; returns the owning user, or None if invalid/expired."""
+    record = await _take_email_token(token, "password_reset")
+    return await get_user(record["user_id"]) if record else None
+
+
+async def set_password(user_id: str, password_hash: str) -> bool:
+    """Set a new password and clear any login lockout."""
+    return await store.users.update(
+        user_id, {"password_hash": password_hash, "failed_login_count": 0, "locked_until": None}
+    )

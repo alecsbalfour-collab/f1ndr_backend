@@ -20,6 +20,8 @@ PUBLIC_ROUTES = {
     ("POST", "/auth/refresh"),
     ("POST", "/auth/verify-email"),
     ("GET", "/auth/verify-email"),
+    ("POST", "/auth/password-reset/request"),
+    ("POST", "/auth/password-reset/confirm"),  # token itself is the credential
     ("POST", "/auth/flutterflow/webhook"),  # guarded by FLUTTERFLOW_API_KEY instead of a user token
     # Anonymous browsing
     ("GET", "/f1ndr/vehicles"),

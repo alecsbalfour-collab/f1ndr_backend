@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     SMTP_TIMEOUT_SECONDS: int = 10
     # Frontend page that receives ?token=...; defaults to this API's GET /auth/verify-email
     EMAIL_VERIFICATION_URL: Optional[str] = None
+    # Frontend page that receives ?token=... for password reset; must point at the app's reset form
+    PASSWORD_RESET_URL: Optional[str] = None
 
     # App Environment
     ENVIRONMENT: str = "development"

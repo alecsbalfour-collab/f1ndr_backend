@@ -33,6 +33,8 @@ from api.schemas.auth_schemas import (
     FlutterFlowWebhook,
     LoginRequest,
     LogoutRequest,
+    PasswordResetConfirm,
+    PasswordResetRequest,
     PublicUser,
     RefreshRequest,
     RegisterRequest,
@@ -42,7 +44,7 @@ from api.schemas.auth_schemas import (
     VerifyEmailRequest,
 )
 from api.schemas.common import Envelope, error_responses, ok
-from api.security.rate_limiter import LOGIN_RATE_LIMIT, REGISTER_RATE_LIMIT, limiter
+from api.security.rate_limiter import LOGIN_RATE_LIMIT, PASSWORD_RESET_RATE_LIMIT, REGISTER_RATE_LIMIT, limiter
 from f1ndr.config.auth_config import auth_config
 from utils.response_builder import error_response, forbidden_response, not_found_response, unauthorized_response
 
@@ -212,6 +214,63 @@ async def verify_email(request: Request, body: VerifyEmailRequest):
             responses=error_responses(400))
 async def verify_email_link(request: Request, token: str = Query(..., min_length=1, max_length=512)):
     return await _verify_email(request, token)
+
+
+@router.post("/password-reset/request", response_model=Envelope[None])
+@limiter.limit(PASSWORD_RESET_RATE_LIMIT)
+async def request_password_reset(request: Request, background_tasks: BackgroundTasks, body: PasswordResetRequest):
+    """
+    Email a single-use reset link. Always returns the same 200 so callers
+    can't probe whether an email has an account.
+    """
+    user = await accounts.get_user_by_email(body.email)
+    if user is not None:
+        token = await accounts.create_password_reset_token(user)
+        # The link must land on the app's reset form, which POSTs token + new password to /confirm.
+        base = get_settings().PASSWORD_RESET_URL or str(request.url_for("confirm_password_reset"))
+        link = f"{base}{'&' if '?' in base else '?'}token={token}"
+        email_body = (
+            f"Hi {user.get('name') or 'there'},\n\n"
+            f"Reset your f1ndr password by opening this link:\n\n{link}\n\n"
+            f"The link expires in {auth_config.password_reset_expiry_minutes} minutes and works once. "
+            "If you didn't ask for this, you can ignore this email.\n"
+        )
+        background_tasks.add_task(send_email, user["email"], "Reset your f1ndr password", email_body)
+        await record_audit("password_reset_requested", request, user_id=user["user_id"], email=user["email"])
+    else:
+        await record_audit("password_reset_requested", request, email=body.email, success=False,
+                           details={"reason": "unknown_email"})
+    return ok(message="If that email has an account, a reset link is on its way")
+
+
+@router.post("/password-reset/confirm", name="confirm_password_reset",
+             response_model=Envelope[SessionsRevoked], responses=error_responses(400))
+@limiter.limit(LOGIN_RATE_LIMIT)
+async def confirm_password_reset(request: Request, body: PasswordResetConfirm):
+    """
+    Consume a reset token and set the new password. Revokes every refresh-token
+    session; outstanding access tokens expire with their normal `expires_in`.
+    """
+    is_valid, errors = validate_password_strength(body.password)
+    if not is_valid:
+        return error_response(
+            message="Password does not meet requirements",
+            status_code=400,
+            details={"password_errors": errors},
+            error_code="WEAK_PASSWORD",
+        )
+
+    user = await accounts.consume_password_reset_token(body.token)
+    if user is None:
+        await record_audit("password_reset_failed", request, success=False, details={"reason": "invalid_token"})
+        return error_response(message="Invalid or expired reset token", status_code=400,
+                              error_code="INVALID_RESET_TOKEN")
+
+    await accounts.set_password(user["user_id"], hash_password(body.password))
+    revoked = await revoke_all_refresh_tokens(user["user_id"], "password_reset")
+    await record_audit("password_reset", request, user_id=user["user_id"], email=user["email"],
+                       details={"sessions_revoked": revoked})
+    return ok({"sessions_revoked": revoked}, "Password updated; all sessions signed out")
 
 
 @router.post("/verify-email/resend", response_model=Envelope[None], responses=error_responses(400, 401, 404))

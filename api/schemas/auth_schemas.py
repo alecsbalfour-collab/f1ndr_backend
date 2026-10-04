@@ -36,6 +36,15 @@ class VerifyEmailRequest(BaseModel):
     token: str = Field(..., min_length=1, max_length=512)
 
 
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str = Field(..., min_length=1, max_length=512)
+    password: str = Password
+
+
 class RolesUpdateRequest(BaseModel):
     roles: List[Role] = Field(..., min_length=1)
 

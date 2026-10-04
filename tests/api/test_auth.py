@@ -228,6 +228,59 @@ def test_admin_email_promoted_only_after_verification(client, outbox, monkeypatc
     assert verified["roles"] == ["user", "admin"]
 
 
+def test_password_reset_flow(client, outbox):
+    data = register(client).json()["data"]
+    # Same 200 for known and unknown emails — the endpoint can't be used to probe accounts.
+    assert client.post("/api/v1/auth/password-reset/request", json={"email": "alice@example.com"}).status_code == 200
+    assert client.post("/api/v1/auth/password-reset/request", json={"email": "nobody@example.com"}).status_code == 200
+    reset_mail = [m for m in outbox if "password" in m["subject"].lower()][-1]
+    token = token_from(reset_mail)
+
+    # A weak password is rejected without consuming the token.
+    weak = client.post("/api/v1/auth/password-reset/confirm", json={"token": token, "password": "short"})
+    assert weak.json()["error_code"] == "WEAK_PASSWORD"
+
+    done = client.post("/api/v1/auth/password-reset/confirm", json={"token": token, "password": "N3w!Passw0rd"})
+    assert done.status_code == 200 and done.json()["data"]["sessions_revoked"] >= 1
+
+    # Old password and every existing session are dead; the new password works.
+    assert login(client).status_code == 401
+    assert client.post("/api/v1/auth/refresh", json={"refresh_token": data["refresh_token"]}).status_code == 401
+    assert login(client, password="N3w!Passw0rd").status_code == 200
+    # Single use.
+    again = client.post("/api/v1/auth/password-reset/confirm", json={"token": token, "password": "N3w!Passw0rd"})
+    assert again.json()["error_code"] == "INVALID_RESET_TOKEN"
+    assert {"password_reset_requested", "password_reset"} <= set(audit_events(data["user"]["user_id"]))
+
+
+def test_password_reset_token_purpose_and_expiry(client, outbox):
+    register(client)
+    # A verification token is not a reset token, and isn't consumed by the attempt.
+    verified_token = token_from(outbox[0])
+    wrong_purpose = client.post("/api/v1/auth/password-reset/confirm",
+                                json={"token": verified_token, "password": "N3w!Passw0rd"})
+    assert wrong_purpose.json()["error_code"] == "INVALID_RESET_TOKEN"
+    assert client.post("/api/v1/auth/verify-email", json={"token": verified_token}).status_code == 200
+
+    client.post("/api/v1/auth/password-reset/request", json={"email": "alice@example.com"})
+    for record in run(store.email_tokens.find({"purpose": "password_reset"})):
+        run(store.email_tokens.update(record["token_hash"], {"expires_at": store.utcnow() - timedelta(seconds=1)}))
+    expired = client.post("/api/v1/auth/password-reset/confirm",
+                          json={"token": token_from(outbox[-1]), "password": "N3w!Passw0rd"})
+    assert expired.json()["error_code"] == "INVALID_RESET_TOKEN"
+
+
+def test_password_reset_clears_lockout(client, outbox):
+    register(client)
+    for _ in range(auth_config.max_login_attempts):
+        login(client, password="Wr0ng!Pass")
+    assert login(client).status_code == 423
+    client.post("/api/v1/auth/password-reset/request", json={"email": "alice@example.com"})
+    token = token_from(outbox[-1])
+    client.post("/api/v1/auth/password-reset/confirm", json={"token": token, "password": "N3w!Passw0rd"})
+    assert login(client, password="N3w!Passw0rd").status_code == 200
+
+
 def test_scopes_guard_admin_routes(client, outbox):
     user = register(client).json()["data"]
     headers = bearer(user["access_token"])
