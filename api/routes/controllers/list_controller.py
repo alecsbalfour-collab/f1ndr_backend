@@ -7,8 +7,9 @@ import logging
 from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, Query
 from api.schemas.common import Page, paged
-from api.schemas.list_schemas import Category, Subcategory, VehicleOut
+from api.schemas.list_schemas import Category, ComparisonGroup, Subcategory, VehicleOut
 from f1ndr.db.db import listings_store as f1ndr_store
+from f1ndr.utils.utils import group_equivalent_listings
 from listr.db.listing_repo import listings_store as listr_store
 from sellr.utils.utils import listings_store as sellr_store
 from utils.response_builder import success_response, error_response, paginated_response
@@ -49,16 +50,7 @@ async def get_unified_listings(
     """
     logger.info(f"Getting unified listings - page: {page}, filters: {search}, {category}, {subcategory}")
 
-    # Same listing can exist in several stores (e.g. a sellr listing pushed to kijiji):
-    # dedupe by listing id, then apply the text/price filters the stores can't express.
-    query = {k: v for k, v in {"category": category, "subcategory": subcategory, "region": region}.items() if v}
-    seen, docs = set(), []
-    for store in (sellr_store, listr_store, f1ndr_store):
-        for doc in await store.find(query, limit=10_000):
-            key = doc.get("id") or doc.get("key") or id(doc)
-            if key not in seen:
-                seen.add(key)
-                docs.append(doc)
+    docs = await _merged_listing_docs(category=category, subcategory=subcategory, region=region)
 
     if search:
         needle = search.lower()
@@ -77,6 +69,53 @@ async def get_unified_listings(
     results = docs[(page - 1) * page_size: page * page_size]
 
     return paged(results, total, page, page_size, "Unified listings retrieved")
+
+
+async def _merged_listing_docs(category=None, subcategory=None, region=None) -> list:
+    """Sellr + listr + scraped-corpus docs, deduped by listing id."""
+    query = {k: v for k, v in {"category": category, "subcategory": subcategory, "region": region}.items() if v}
+    seen, docs = set(), []
+    for store in (sellr_store, listr_store, f1ndr_store):
+        for doc in await store.find(query, limit=10_000):
+            key = doc.get("id") or doc.get("key") or id(doc)
+            if key not in seen:
+                seen.add(key)
+                docs.append(doc)
+    return docs
+
+
+@router.get("/compare", response_model=Page[ComparisonGroup])
+async def get_comparison_groups(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    search: Optional[str] = None,
+    category: Optional[Category] = None,
+    subcategory: Optional[Subcategory] = None,
+    region: Optional[str] = None,
+    listing_id: Optional[str] = None,
+    title_threshold: float = Query(0.6, ge=0.3, le=1.0),
+    price_delta: float = Query(0.15, ge=0.0, le=1.0),
+):
+    """Group listings believed to be the same item across platforms/sellers.
+
+    Two listings cluster when they share category+region, their titles are similar
+    (normalized tokens, `title_threshold` Jaccard), structured fields agree when both
+    are set (year/make/model), and prices fall within `price_delta` of each other.
+    `listing_id` scopes the result to the group containing that listing.
+    """
+    docs = await _merged_listing_docs(category=category, subcategory=subcategory, region=region)
+    if search:
+        needle = search.lower()
+        docs = [d for d in docs
+                if needle in " ".join(str(d.get(f) or "") for f in ("title", "description", "make", "model", "location")).lower()]
+
+    groups = group_equivalent_listings(docs, title_threshold=title_threshold, price_delta=price_delta)
+    if listing_id:
+        groups = [g for g in groups if any(d.get("id") == listing_id for d in g["listings"])]
+
+    total = len(groups)
+    results = groups[(page - 1) * page_size: page * page_size]
+    return paged(results, total, page, page_size, "Comparison groups retrieved")
 
 
 # Platform spellings differ between listr pushes and scraper source names.

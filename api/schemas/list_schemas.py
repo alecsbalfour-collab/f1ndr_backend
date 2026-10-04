@@ -72,6 +72,18 @@ class VehicleOut(Record):
     first_seen_at: Optional[str] = None
 
 
+class ComparisonGroup(Record):
+    """Listings believed to be the same item across platforms/sellers."""
+    key: str
+    title: Optional[str] = None
+    count: int = 0
+    platforms: List[str] = Field(default_factory=list)
+    min_price: Optional[float] = None
+    max_price: Optional[float] = None
+    price_spread: Optional[float] = None
+    listings: List[VehicleOut] = Field(default_factory=list)
+
+
 class ListrListing(VehicleOut):
     platform: str
     updated_at: str

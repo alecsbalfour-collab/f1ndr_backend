@@ -20,7 +20,13 @@ def client():
 
 @pytest.fixture(autouse=True)
 def clean_corpus():
-    listings_store.clear_memory()
+    # Other tests' in-memory docs leak through the shared stores (unified/compare
+    # merge all three), so clear all of them.
+    from listr.db.listing_repo import listings_store as listr_store
+    from sellr.utils.utils import listings_store as sellr_store
+
+    for store in (listings_store, listr_store, sellr_store):
+        store.clear_memory()
 
 
 KIJIJI_URL = "https://www.kijiji.ca/v-cars-trucks/calgary/honda-civic/12345"
@@ -269,3 +275,56 @@ def test_alert_matching_rules():
     assert not _alert_matches({**alert, "make": "toyota"}, listing)
     assert not _alert_matches({"status": "active"}, listing)  # no filters = not configured
     assert not _alert_matches({"status": "active", "query": "civic", "location": "edmonton"}, listing)
+
+
+FB_URL = "https://www.facebook.com/marketplace/item/77"
+
+
+@pytest.mark.asyncio
+async def test_comparison_groups_endpoint(client):
+    await save_scraped_listings(
+        [{"title": "2019 Honda Civic LX Sedan", "price_value": 18500.0, "url": KIJIJI_URL, "location": "Calgary, AB"}],
+        platform="kijiji",
+    )
+    await save_scraped_listings(
+        [
+            {"title": "Honda Civic LX 2019 sedan", "price_value": 17800.0, "url": FB_URL, "location": "Calgary"},
+            {"title": "Snowboard bindings", "price_value": 120.0, "url": FB_URL + "x"},
+            {"title": "Honda Civic LX 2019", "price_value": 40000.0, "url": FB_URL + "y"},
+        ],
+        platform="facebook",
+    )
+
+    resp = client.get(f"{API}/listings/compare").json()
+    groups = resp["data"]
+    assert len(groups) == 1  # far-priced twin and unrelated item stay out
+    group = groups[0]
+    assert group["count"] == 2
+    assert set(group["platforms"]) == {"kijiji", "facebook"}
+    assert group["min_price"] == 17800.0
+    assert group["price_spread"] == 700.0
+
+    scoped = client.get(
+        f"{API}/listings/compare",
+        params={"listing_id": scraped_listing_id("facebook", FB_URL)},
+    ).json()
+    assert len(scoped["data"]) == 1
+
+    miss = client.get(f"{API}/listings/compare", params={"listing_id": "nope"}).json()
+    assert miss["data"] == []
+
+
+def test_listings_equivalent_rules():
+    from f1ndr.utils.utils import listings_equivalent
+
+    a = {"id": "1", "title": "2019 Honda Civic LX", "price": 18500.0, "category": "vehicles",
+         "region": "calgary", "year": 2019}
+    b = {"id": "2", "title": "Honda Civic LX 2019", "price": 17800.0, "category": "vehicles",
+         "region": "calgary"}
+
+    assert listings_equivalent(a, b)
+    assert not listings_equivalent(a, {**b, "price": 30000.0})          # outside price delta
+    assert not listings_equivalent(a, {**b, "region": "edmonton"})      # different market
+    assert not listings_equivalent(a, {**b, "category": "goods"})       # different vertical
+    assert not listings_equivalent(a, {**b, "year": 2020})              # conflicting structured field
+    assert not listings_equivalent(a, {**b, "title": "Snowboard bindings"})

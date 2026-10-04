@@ -2,6 +2,8 @@
 Utility functions for f1ndr.
 """
 
+import hashlib
+import re
 from typing import Dict, List, Any, Optional
 import math
 
@@ -106,6 +108,122 @@ def detect_duplicates(
             duplicates.append(other)
 
     return duplicates
+
+
+_TITLE_STOPWORDS = {
+    "for", "sale", "the", "a", "an", "in", "on", "obo", "firm", "new", "used",
+    "great", "good", "excellent", "condition", "mint", "must", "go", "price",
+    "reduced", "selling", "moving", "pickup", "only",
+}
+
+
+def _title_tokens(title: str) -> set:
+    """Normalized content tokens: lowercase alphanumeric, filler words dropped."""
+    return {t for t in re.findall(r"[a-z0-9]+", (title or "").lower()) if t not in _TITLE_STOPWORDS}
+
+
+def _same_when_present(a: dict, b: dict, fields) -> bool:
+    """Structured fields must agree whenever both listings carry a value."""
+    for f in fields:
+        av, bv = a.get(f), b.get(f)
+        if av is not None and bv is not None and str(av).strip().lower() != str(bv).strip().lower():
+            return False
+    return True
+
+
+def listings_equivalent(a: dict, b: dict, title_threshold: float = 0.6, price_delta: float = 0.15) -> bool:
+    """Are two listings likely the same item on different platforms?
+
+    General-classifieds rules (not vehicle-specific): same category and region,
+    shared structured fields must agree when both are set, titles must be similar
+    enough, and prices must be within the delta when both have one.
+    """
+    if a is b or (a.get("id") and a.get("id") == b.get("id")):
+        return False
+    if (a.get("category") or "other") != (b.get("category") or "other"):
+        return False
+    if a.get("region") and b.get("region") and a["region"] != b["region"]:
+        return False
+    if not _same_when_present(a, b, ("year", "make", "model")):
+        return False
+    ta, tb = _title_tokens(a.get("title", "")), _title_tokens(b.get("title", ""))
+    if not ta or not tb:
+        return False
+    if len(ta & tb) / len(ta | tb) < title_threshold:
+        return False
+    pa, pb = a.get("price"), b.get("price")
+    if (
+        isinstance(pa, (int, float))
+        and isinstance(pb, (int, float))
+        and max(pa, pb) > 0
+        and abs(pa - pb) / max(pa, pb) > price_delta
+    ):
+        return False
+    return True
+
+
+def group_equivalent_listings(
+    listings: List[dict],
+    title_threshold: float = 0.6,
+    price_delta: float = 0.15,
+) -> List[dict]:
+    """Cluster listings into comparison groups (size >= 2) via union-find.
+
+    Pairwise checks are bucketed by (category, region) to keep the cost sane as
+    the corpus grows; refine with a blocking index if buckets get big.
+    Each group: key, title, count, platforms, min/max price, spread, listings.
+    """
+    n = len(listings)
+    parent = list(range(n))
+
+    def find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(x: int, y: int) -> None:
+        parent[find(x)] = find(y)
+
+    buckets: Dict[Any, List[int]] = {}
+    for i, l in enumerate(listings):
+        buckets.setdefault((l.get("category") or "other", l.get("region")), []).append(i)
+
+    for bucket in buckets.values():
+        for pos in range(len(bucket)):
+            for other in bucket[pos + 1:]:
+                if listings_equivalent(
+                    listings[bucket[pos]], listings[other], title_threshold, price_delta
+                ):
+                    union(bucket[pos], other)
+
+    clusters: Dict[int, List[dict]] = {}
+    for i, l in enumerate(listings):
+        clusters.setdefault(find(i), []).append(l)
+
+    groups = []
+    for members in clusters.values():
+        if len(members) < 2:
+            continue
+        members.sort(key=lambda d: (d.get("price") is None, d.get("price") or 0))
+        prices = [d["price"] for d in members if isinstance(d.get("price"), (int, float))]
+        key = hashlib.sha256(
+            "|".join(sorted(d.get("id") or d.get("url") or "" for d in members)).encode()
+        ).hexdigest()[:12]
+        groups.append(
+            {
+                "key": key,
+                "title": members[0].get("title"),
+                "count": len(members),
+                "platforms": sorted({d.get("platform") for d in members if d.get("platform")}),
+                "min_price": min(prices) if prices else None,
+                "max_price": max(prices) if prices else None,
+                "price_spread": (max(prices) - min(prices)) if prices else None,
+                "listings": members,
+            }
+        )
+    groups.sort(key=lambda g: (-g["count"], g["min_price"] if g["min_price"] is not None else 0))
+    return groups
 
 
 def detect_fraud(
