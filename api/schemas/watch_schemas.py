@@ -1,6 +1,6 @@
 """watchr alert and subscription models."""
 
-from typing import ClassVar, FrozenSet, Optional
+from typing import Any, ClassVar, Dict, FrozenSet, Optional
 
 from pydantic import Field
 
@@ -21,6 +21,8 @@ class Alert(OpenPayload):
     year_max: Optional[int] = Field(None, ge=1886, le=2100)
     price_min: Optional[float] = Field(None, ge=0)
     price_max: Optional[float] = Field(None, ge=0)
+    region: Optional[str] = Field(None, max_length=100)
+    location: Optional[str] = Field(None, max_length=200)
 
 
 class Subscription(OpenPayload):
@@ -42,6 +44,8 @@ class AlertOut(Record):
     year_max: Optional[int] = None
     price_min: Optional[float] = None
     price_max: Optional[float] = None
+    region: Optional[str] = None
+    location: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
@@ -52,3 +56,14 @@ class SubscriptionOut(Record):
     user_id: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
+
+
+class MatchOut(Record):
+    id: Optional[str] = None
+    alert_id: Optional[str] = None
+    alert_name: Optional[str] = None
+    user_id: Optional[str] = None
+    listing_id: Optional[str] = None
+    listing: Optional[Dict[str, Any]] = None
+    matched_at: Optional[str] = None
+    notified: Optional[bool] = None

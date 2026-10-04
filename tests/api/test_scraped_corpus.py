@@ -39,7 +39,7 @@ async def test_scraped_listings_persist_and_dedupe():
         },
         {"title": "missing url gets skipped"},
     ]
-    assert await save_scraped_listings(raw, platform="kijiji") == 1
+    assert len(await save_scraped_listings(raw, platform="kijiji")) == 1
 
     doc = await listings_store.get(scraped_listing_id("kijiji", KIJIJI_URL))
     assert doc["platform"] == "kijiji"
@@ -51,7 +51,7 @@ async def test_scraped_listings_persist_and_dedupe():
     # Re-scraping the same URL refreshes one document instead of duplicating.
     first_seen = doc["first_seen_at"]
     raw[0]["price_value"] = 17500.0
-    assert await save_scraped_listings(raw[:1], platform="kijiji") == 1
+    assert len(await save_scraped_listings(raw[:1], platform="kijiji")) == 1
     docs = await listings_store.find({"platform": "kijiji"})
     assert len(docs) == 1
     assert docs[0]["price"] == 17500.0
@@ -128,3 +128,93 @@ async def test_corpus_surfaces_in_unified_raw_and_search(client):
 
 def test_get_scrapers_db_returns_handle():
     assert get_scrapers_db() is not None
+
+
+@pytest.mark.asyncio
+async def test_alert_matches_on_ingest_and_dedupes(monkeypatch):
+    from watchr.core import core as watchr_core
+
+    watchr_core.alerts_store.clear_memory()
+    watchr_core.matches_store.clear_memory()
+
+    sent = []
+
+    async def fake_user(user_id):
+        return {"user_id": user_id, "email": f"{user_id}@example.com"}
+
+    async def fake_send(to, subject, body):
+        sent.append((to, subject))
+        return True
+
+    monkeypatch.setattr("api.auth.accounts.get_user", fake_user)
+    monkeypatch.setattr("api.auth.email.send_email", fake_send)
+
+    alert = await watchr_core.create_alert(
+        {"name": "Civics", "query": "civic", "price_max": 20000, "user_id": "u-watch"}
+    )
+    await watchr_core.create_alert({"name": "Boards", "query": "snowboard", "user_id": "u-watch"})
+
+    listings = await save_scraped_listings(
+        [{"title": "2019 Honda Civic", "price_value": 18500.0, "url": KIJIJI_URL, "location": "Calgary, AB"}],
+        platform="kijiji",
+    )
+    assert await watchr_core.evaluate_listings(listings) == 1
+    assert sent == [("u-watch@example.com", "f1ndr alert: 2019 Honda Civic")]
+
+    # Re-scraping the same listing must not re-notify.
+    assert await watchr_core.evaluate_listings(listings) == 0
+    assert len(sent) == 1
+
+    matches = await watchr_core.matches_store.find({"alert_id": alert["alert_id"]})
+    assert len(matches) == 1
+    assert matches[0]["notified"] is True
+    assert matches[0]["listing"]["url"] == KIJIJI_URL
+
+    # A listing outside the filters does not match.
+    expensive = await save_scraped_listings(
+        [{"title": "2019 Honda Civic Si", "price_value": 32000.0, "url": KIJIJI_URL + "x"}],
+        platform="kijiji",
+    )
+    assert await watchr_core.evaluate_listings(expensive) == 0
+
+
+@pytest.mark.asyncio
+async def test_matches_route_scoped_to_user(client, headers_for):
+    from watchr.core import core as watchr_core
+
+    watchr_core.alerts_store.clear_memory()
+    watchr_core.matches_store.clear_memory()
+
+    headers = headers_for("user", sub="watcher-1")
+    resp = client.post(f"{API}/watchr/alerts", json={"name": "civics", "query": "civic"}, headers=headers)
+    assert resp.status_code == 201
+
+    await watchr_core.evaluate_listings(
+        await save_scraped_listings(
+            [{"title": "Honda Civic", "price_value": 9000.0, "url": KIJIJI_URL + "/m"}],
+            platform="kijiji",
+        )
+    )
+
+    mine = client.get(f"{API}/watchr/matches", headers=headers).json()
+    assert mine["data"][0]["alert_name"] == "civics"
+    assert mine["data"][0]["listing"]["url"] == KIJIJI_URL + "/m"
+
+    other = client.get(f"{API}/watchr/matches", headers=headers_for("user", sub="watcher-2")).json()
+    assert other["data"] == []
+
+
+def test_alert_matching_rules():
+    from watchr.core.core import _alert_matches
+
+    alert = {"status": "active", "query": "civic", "region": "calgary", "price_max": 20000}
+    listing = {"title": "Honda Civic", "price": 10000, "region": "calgary", "location": "Calgary, AB"}
+
+    assert _alert_matches(alert, listing)
+    assert _alert_matches({**alert, "make": "honda"}, listing)  # make found in the text blob
+    assert not _alert_matches({**alert, "status": "paused"}, listing)
+    assert not _alert_matches({**alert, "region": "edmonton"}, listing)
+    assert not _alert_matches({**alert, "price_max": 5000}, listing)
+    assert not _alert_matches({**alert, "make": "toyota"}, listing)
+    assert not _alert_matches({"status": "active"}, listing)  # no filters = not configured
+    assert not _alert_matches({"status": "active", "query": "civic", "location": "edmonton"}, listing)

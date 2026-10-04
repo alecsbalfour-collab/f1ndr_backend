@@ -36,14 +36,14 @@ async def save_scraped_listings(
     platform: str,
     category: str = "other",
     region: str = "calgary",
-) -> int:
-    """Upsert a scraper's results into the f1ndr corpus.
+) -> List[Dict[str, Any]]:
+    """Upsert a scraper's results into the f1ndr corpus. Returns the saved docs.
 
     `price` stays numeric (from the parsed price_value); the site's display string is
     kept as `price_text`. `first_seen_at` survives refreshes; `scraped_at` moves.
     """
     now = datetime.now(timezone.utc).isoformat()
-    saved = 0
+    saved = []
     for raw in listings:
         url, title = raw.get("url"), raw.get("title")
         if not url or not title:
@@ -62,7 +62,7 @@ async def save_scraped_listings(
         existing = await listings_store.get(doc["id"])
         doc["first_seen_at"] = (existing or {}).get("first_seen_at") or now
         await listings_store.upsert(doc)
-        saved += 1
+        saved.append(doc)
     return saved
 
 

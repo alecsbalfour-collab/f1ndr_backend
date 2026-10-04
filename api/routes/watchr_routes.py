@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from typing import Any, Dict, Optional
 from api.dependencies.auth import owns, require_user
 from api.schemas.common import Envelope, ModuleStatus, Page, error_responses, ok, paged
-from api.schemas.watch_schemas import Alert, AlertOut, Subscription, SubscriptionOut
+from api.schemas.watch_schemas import Alert, AlertOut, MatchOut, Subscription, SubscriptionOut
 from utils.response_builder import error_response
 from watchr.core import core as watchr_core
 
@@ -99,6 +99,17 @@ async def delete_alert(alert_id: str, claims: Dict[str, Any] = Depends(require_u
     if alert is None or not owns(claims, alert, "user_id") or not await watchr_core.delete_alert(alert_id):
         return _not_found()
     return ok(message="Alert deleted successfully")
+
+
+@router.get("/matches", response_model=Page[MatchOut], responses=error_responses(401))
+async def get_matches(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    claims: Dict[str, Any] = Depends(require_user),
+):
+    """Listings that matched the caller's alerts (newest first)."""
+    result = await watchr_core.list_matches(claims["sub"], page, page_size)
+    return paged(result["matches"], result["total"], page, page_size, "Matches retrieved")
 
 
 @router.post("/subscriptions", status_code=201, response_model=Envelope[SubscriptionOut], responses=error_responses(401))

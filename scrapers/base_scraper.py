@@ -215,15 +215,21 @@ class BaseScraper:
         self.metrics.record_success(result["duration_ms"], result["count"])
         logger.info("%s: %d listings in %.0fms", self.source_name, result["count"], result["duration_ms"])
 
-        # Persist into the f1ndr corpus; a persistence failure must not fail the scrape.
+        # Persist into the f1ndr corpus, then feed watchr alert matching.
+        # Neither must ever fail the scrape itself.
         if listings:
             try:
-                await save_scraped_listings(
+                saved = await save_scraped_listings(
                     listings,
                     platform=self.source_name,
                     category=self.default_category,
                     region=self.region,
                 )
+                try:
+                    from watchr.core.core import evaluate_listings
+                    await evaluate_listings(saved)
+                except Exception as e:
+                    logger.warning("%s: watchr alert matching failed: %s", self.source_name, e)
             except Exception as e:
                 logger.warning("%s: could not persist scraped listings: %s", self.source_name, e)
         if self.config.cache_ttl_seconds:
