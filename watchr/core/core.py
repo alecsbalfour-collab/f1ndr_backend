@@ -137,15 +137,47 @@ def _alert_matches(alert: dict, listing: dict) -> bool:
     return True
 
 
-async def evaluate_listing(listing: dict) -> int:
-    """Match one listing against active alerts; email the owner on first match.
+def _listing_snapshot(listing: dict) -> dict:
+    return {
+        k: listing.get(k)
+        for k in ("title", "price", "price_text", "url", "image", "platform", "location", "region")
+    }
 
-    A `watchr_matches` record per (alert, listing) dedupes re-scrapes and feeds
-    `GET /watchr/matches`. Returns the number of new matches.
-    """
+
+async def _notify_match(alert: dict, listing: dict, dropped_from: Optional[float] = None) -> bool:
+    """Email the alert owner; returns whether the send succeeded."""
     from api.auth.accounts import get_user
     from api.auth.email import send_email
 
+    user = await get_user(alert.get("user_id") or "")
+    if not (user and user.get("email")):
+        return False
+    title = listing.get("title") or "listing"
+    price_line = f"Price: {listing.get('price_text') or listing.get('price') or 'n/a'}\n"
+    if dropped_from is None:
+        subject = f"f1ndr alert: {title}"
+        body = f'Your alert "{alert.get("name")}" matched a new listing.\n\n{title}\n' + price_line
+    else:
+        subject = f"f1ndr price drop: {title}"
+        body = (
+            f'The price on a listing matching "{alert.get("name")}" dropped.\n\n{title}\n'
+            f"Price dropped: {dropped_from} -> {listing.get('price')}\n"
+        )
+    body += (
+        f"Location: {listing.get('location') or 'n/a'}\n"
+        f"Source: {listing.get('platform') or 'n/a'}\n\n"
+        f"{listing.get('url') or ''}"
+    )
+    return await send_email(user["email"], subject, body)
+
+
+async def evaluate_listing(listing: dict) -> int:
+    """Match one listing against active alerts; email the owner on first match,
+    and again when a re-scrape shows the price dropped below the last-seen price.
+
+    A `watchr_matches` record per (alert, listing) dedupes re-scrapes and feeds
+    `GET /watchr/matches`. Returns the number of new matches (price drops don't count).
+    """
     if not listing.get("id"):
         return 0
     matched = 0
@@ -153,7 +185,25 @@ async def evaluate_listing(listing: dict) -> int:
         if not _alert_matches(alert, listing):
             continue
         match_id = f"{alert['alert_id']}:{listing['id']}"
-        if await matches_store.get(match_id):
+        existing = await matches_store.get(match_id)
+        if existing is not None:
+            old_price = (existing.get("listing") or {}).get("price")
+            new_price = listing.get("price")
+            if (
+                isinstance(old_price, (int, float))
+                and isinstance(new_price, (int, float))
+                and new_price < old_price
+            ):
+                sent = await _notify_match(alert, listing, dropped_from=old_price)
+                await matches_store.update(
+                    match_id,
+                    {
+                        "listing": _listing_snapshot(listing),
+                        "previous_price": old_price,
+                        "price_dropped_at": datetime.utcnow().isoformat(),
+                        "notified": existing.get("notified") or sent,
+                    },
+                )
             continue
         record = {
             "id": match_id,
@@ -161,29 +211,13 @@ async def evaluate_listing(listing: dict) -> int:
             "alert_name": alert.get("name"),
             "user_id": alert.get("user_id"),
             "listing_id": listing["id"],
-            "listing": {
-                k: listing.get(k)
-                for k in ("title", "price", "price_text", "url", "image", "platform", "location", "region")
-            },
+            "listing": _listing_snapshot(listing),
             "matched_at": datetime.utcnow().isoformat(),
             "notified": False,
         }
         await matches_store.upsert(record)
-
-        user = await get_user(alert.get("user_id") or "")
-        if user and user.get("email"):
-            sent = await send_email(
-                user["email"],
-                f"f1ndr alert: {listing.get('title') or 'new match'}",
-                f'Your alert "{alert.get("name")}" matched a new listing.\n\n'
-                f"{listing.get('title')}\n"
-                f"Price: {listing.get('price_text') or listing.get('price') or 'n/a'}\n"
-                f"Location: {listing.get('location') or 'n/a'}\n"
-                f"Source: {listing.get('platform') or 'n/a'}\n\n"
-                f"{listing.get('url') or ''}",
-            )
-            if sent:
-                await matches_store.update(match_id, {"notified": True})
+        if await _notify_match(alert, listing):
+            await matches_store.update(match_id, {"notified": True})
         matched += 1
     return matched
 
