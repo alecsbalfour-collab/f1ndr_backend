@@ -122,14 +122,33 @@ class BaseScraper:
         async with async_playwright() as playwright:
             browser = await playwright.chromium.launch(
                 headless=cfg.headless,
-                # Container runtime: no user namespaces, tiny /dev/shm.
-                args=["--no-sandbox", "--disable-dev-shm-usage"],
+                # Container runtime: no user namespaces, tiny /dev/shm, ~512MB RAM.
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                    "--disable-extensions",
+                    "--disable-background-networking",
+                    "--no-zygote",
+                    "--js-flags=--max-old-space-size=256",
+                ],
             )
             try:
                 context = await browser.new_context(
                     user_agent=cfg.user_agent,
                     viewport={"width": cfg.viewport_width, "height": cfg.viewport_height},
                     locale=cfg.locale,
+                )
+                # Scraping only needs the DOM: images/fonts/media cost the most
+                # memory and are never used by the parser. Abort them at the
+                # network layer; img src attributes still appear in the HTML.
+                await context.route(
+                    "**/*",
+                    lambda route: (
+                        route.abort()
+                        if route.request.resource_type in {"image", "media", "font"}
+                        else route.continue_()
+                    ),
                 )
                 last_error: Optional[Exception] = None
                 for attempt in range(cfg.max_retries + 1):

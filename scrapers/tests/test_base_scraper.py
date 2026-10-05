@@ -163,6 +163,9 @@ class _FakeBrowser:
     async def new_context(self, **_):
         return self
 
+    async def route(self, *_args, **_kwargs):
+        pass
+
     async def new_page(self):
         return _FakePage(self)
 
