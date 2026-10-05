@@ -2,7 +2,8 @@
 
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, BeforeValidator, Field, model_validator
+from typing_extensions import Annotated
 
 from api.schemas.common import LooseVIN, OpenPayload, Record
 from listr.config.config import get_listr_config
@@ -21,13 +22,18 @@ Subcategory = Literal[
     "other",
 ]
 
+# Clients like FlutterFlow send empty strings for unset filters; treat "" as absent.
+_BlankToNone = BeforeValidator(lambda v: None if isinstance(v, str) and not v.strip() else v)
+OptCategory = Annotated[Optional[Category], _BlankToNone]
+OptSubcategory = Annotated[Optional[Subcategory], _BlankToNone]
+
 
 class VehicleIn(OpenPayload):
     title: Optional[str] = Field(None, max_length=500)
     description: Optional[str] = Field(None, max_length=10_000)
     vin: Optional[LooseVIN] = None
-    category: Optional[Category] = None
-    subcategory: Optional[Subcategory] = None
+    category: OptCategory = None
+    subcategory: OptSubcategory = None
     make: Optional[str] = Field(None, max_length=100)
     model: Optional[str] = Field(None, max_length=100)
     trim: Optional[str] = Field(None, max_length=100)

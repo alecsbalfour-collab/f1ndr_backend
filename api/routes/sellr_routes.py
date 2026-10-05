@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from typing import Any, Dict, Optional
 from api.dependencies.auth import owns, require_scopes
 from api.schemas.common import Envelope, ModuleStatus, Page, error_responses, ok, paged
-from api.schemas.list_schemas import Category, Subcategory
+from api.schemas.list_schemas import Category, OptCategory, OptSubcategory, Subcategory
 from api.schemas.sell_schemas import SellListing, SellListingCreate, SellListingUpdate
 from utils.response_builder import error_response
 from sellr.config.config import get_listings_config
@@ -93,8 +93,8 @@ async def get_listings(
     user_id: Optional[str] = None,
     status: Optional[str] = None,
     platform: Optional[str] = None,
-    category: Optional[Category] = None,
-    subcategory: Optional[Subcategory] = None
+    category: OptCategory = None,
+    subcategory: OptSubcategory = None
 ):
     """
     Get listings with FlutterFlow-compatible pagination and filtering.

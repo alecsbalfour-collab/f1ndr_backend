@@ -7,7 +7,7 @@ import logging
 from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, Query
 from api.schemas.common import Page, paged
-from api.schemas.list_schemas import Category, ComparisonGroup, Subcategory, VehicleOut
+from api.schemas.list_schemas import Category, ComparisonGroup, OptCategory, OptSubcategory, Subcategory, VehicleOut
 from f1ndr.db.db import listings_store as f1ndr_store
 from f1ndr.utils.utils import group_equivalent_listings
 from listr.db.listing_repo import listings_store as listr_store
@@ -26,8 +26,8 @@ async def get_unified_listings(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     search: Optional[str] = None,
-    category: Optional[Category] = None,
-    subcategory: Optional[Subcategory] = None,
+    category: OptCategory = None,
+    subcategory: OptSubcategory = None,
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
     region: Optional[str] = None,
@@ -89,8 +89,8 @@ async def get_comparison_groups(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     search: Optional[str] = None,
-    category: Optional[Category] = None,
-    subcategory: Optional[Subcategory] = None,
+    category: OptCategory = None,
+    subcategory: OptSubcategory = None,
     region: Optional[str] = None,
     listing_id: Optional[str] = None,
     title_threshold: float = Query(0.6, ge=0.3, le=1.0),

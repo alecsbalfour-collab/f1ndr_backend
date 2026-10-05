@@ -314,6 +314,14 @@ async def test_comparison_groups_endpoint(client):
     assert miss["data"] == []
 
 
+def test_blank_query_params_are_unset(client):
+    # FlutterFlow sends empty strings for unbound params; they must not 422.
+    resp = client.get(f"{API}/listings/unified?category=&subcategory=&region=")
+    assert resp.status_code == 200
+    resp = client.get(f"{API}/listings/compare?category=")
+    assert resp.status_code == 200
+
+
 def test_listings_equivalent_rules():
     from f1ndr.utils.utils import listings_equivalent
 

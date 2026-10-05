@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 from api.dependencies.auth import is_admin, owns, require_scopes
 from api.schemas.common import Envelope, ModuleStatus, Page, error_responses, ok, paged
 from api.schemas.dealr_schemas import InventoryCreate, InventoryIn, InventoryItem
-from api.schemas.list_schemas import Category, Subcategory
+from api.schemas.list_schemas import Category, OptCategory, OptSubcategory, Subcategory
 from utils.response_builder import error_response
 from dealr.config.dealr_config import dealr_config
 from dealr.core.core import ingest_inventory, sync_inventory
@@ -70,8 +70,8 @@ async def get_inventory(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     status: Optional[str] = None,
-    category: Optional[Category] = None,
-    subcategory: Optional[Subcategory] = None,
+    category: OptCategory = None,
+    subcategory: OptSubcategory = None,
     claims: Dict[str, Any] = Depends(_READER),
 ):
     """

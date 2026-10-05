@@ -5,7 +5,7 @@ from typing import Any, ClassVar, Dict, FrozenSet, Optional
 from pydantic import Field
 
 from api.schemas.common import OpenPayload, Record
-from api.schemas.list_schemas import Category, Subcategory
+from api.schemas.list_schemas import Category, OptCategory, OptSubcategory, Subcategory
 
 
 class Alert(OpenPayload):
@@ -13,8 +13,8 @@ class Alert(OpenPayload):
     server_fields: ClassVar[FrozenSet[str]] = frozenset({"user_id"})
     name: str = Field(..., min_length=1, max_length=100)
     query: Optional[str] = Field(None, max_length=200)
-    category: Optional[Category] = None
-    subcategory: Optional[Subcategory] = None
+    category: OptCategory = None
+    subcategory: OptSubcategory = None
     make: Optional[str] = Field(None, max_length=100)
     model: Optional[str] = Field(None, max_length=100)
     year_min: Optional[int] = Field(None, ge=1886, le=2100)
