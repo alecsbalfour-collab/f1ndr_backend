@@ -17,6 +17,9 @@ import argparse
 import asyncio
 import logging
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from db.connection_db import close_db_connection, connect_to_db, get_database
 from scrapers.module import SCRAPER_CLASSES, run_scraper
