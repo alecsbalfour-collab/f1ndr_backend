@@ -1,0 +1,56 @@
+name: Scrape Listings
+
+# Chromium scraping does not fit in the API's 512MB container, so it runs here:
+# GitHub runners have ~7GB and Playwright installs cleanly. Results persist to
+# the same MongoDB the API reads, via scripts/run_scrape.py.
+#
+# Requires a repo secret: MONGODB_URI (same value Render uses).
+
+on:
+  schedule:
+    - cron: "23 */6 * * *" # every 6 hours, off the hour
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "Platform to scrape, or 'all'"
+        required: true
+        default: "kijiji"
+      query:
+        description: "Search query (e.g. civic); empty = platform default page"
+        required: false
+        default: ""
+
+permissions: {}
+
+concurrency:
+  group: scrape
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - run: python -m playwright install --with-deps chromium
+
+      - name: Run scraper
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          MONGODB_DB_NAME: f1ndr
+          MONGODB_REQUIRED: "true"
+          # Required by settings validation; never used to sign or verify
+          # anything in the runner.
+          JWT_SECRET_KEY: scrape-runner-placeholder-000000000000000000000
+        run: >-
+          python scripts/run_scrape.py
+          --platform "${{ inputs.platform || 'all' }}"
+          --query "${{ inputs.query }}"
