@@ -273,27 +273,23 @@ class TrinnScheduler:
     
     async def _execute_task(self, task: ScheduledTask) -> None:
         """Execute a scheduled task and reschedule if needed."""
+        # Import here to avoid circular dependency
+        from trinn.core.core import run_task
+
         try:
-            # Import here to avoid circular dependency
-            from trinn.core.core import run_task
-            
-            # Execute the task
-            result = await run_task(task.task_data)
-            
-            # Update task metadata
+            task.metadata["last_result"] = await run_task(task.task_data)
+        except Exception as e:
+            logger.error(f"Task execution failed: {e}")
+            task.metadata["last_error"] = str(e)
+            raise
+        finally:
             async with self._lock:
                 task.last_run = datetime.utcnow()
                 task.run_count += 1
-                task.metadata["last_result"] = result
-                
-                # Reschedule task
+                # A failed run still consumed its slot: push next_run out by the
+                # interval so a failing task doesn't retry on every scheduler tick.
                 if task.enabled:
                     task.next_run = datetime.utcnow() + timedelta(hours=task.interval_hours)
-                    logger.info(f"Rescheduled task {task.task_id} for {task.next_run}")
-        
-        except Exception as e:
-            logger.error(f"Task execution failed: {e}")
-            raise
     
     def _update_average_run_time(self, new_time: float) -> None:
         """Update average run time with exponential smoothing."""
