@@ -120,7 +120,11 @@ class BaseScraper:
         """
         cfg = self.config
         async with async_playwright() as playwright:
-            browser = await playwright.chromium.launch(headless=cfg.headless)
+            browser = await playwright.chromium.launch(
+                headless=cfg.headless,
+                # Container runtime: no user namespaces, tiny /dev/shm.
+                args=["--no-sandbox", "--disable-dev-shm-usage"],
+            )
             try:
                 context = await browser.new_context(
                     user_agent=cfg.user_agent,
