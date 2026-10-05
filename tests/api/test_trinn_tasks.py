@@ -66,6 +66,21 @@ def test_task_endpoints_require_admin(client, headers_for):
     assert client.delete(f"{API_V1_PREFIX}/trinn/tasks/abc", headers=headers_for("dealer")).status_code == 403
 
 
+def test_run_scrape_failure_returns_502(client, headers_for, monkeypatch):
+    """A failed task execution surfaces as 502 TASK_FAILED-ish error, not a bare 500."""
+    import trinn.core.core as core
+
+    monkeypatch.setattr(core, "run_scraper", AsyncMock(return_value={"success": False, "error": "blocked"}))
+    resp = client.post(
+        f"{API_V1_PREFIX}/trinn/run",
+        json={"task": "scrape", "platform": "kijiji"},
+        headers=headers_for("admin"),
+    )
+    assert resp.status_code == 502
+    body = resp.json()
+    assert body["success"] is False and body["error_code"] == "TRINN_ERROR"
+
+
 def test_scheduler_status_endpoint(client, headers_for):
     resp = client.get(f"{API_V1_PREFIX}/trinn/scheduler", headers=headers_for("admin"))
     assert resp.status_code == 200

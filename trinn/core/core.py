@@ -44,7 +44,9 @@ async def run_task(data: Dict[str, Any]) -> Dict[str, Any]:
             return await _execute_sync_task(data, config)
         else:
             raise ValidationError(f"Invalid or disabled trinn task: {task_type}")
-            
+
+    except TrinnError:
+        raise
     except Exception as e:
         logger.error(f"Task execution failed: {e}")
         raise TrinnError(f"Task execution failed: {str(e)}")

@@ -14,6 +14,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from api.errors.api_exceptions import APIException
 from dealr.core.errors_core import DealrError
+from trinn.core.exceptions_core import TrinnError, ValidationError as TrinnValidationError, ExternalServiceError
 from utils.response_builder import error_response
 
 logger = logging.getLogger("api.error")
@@ -106,10 +107,28 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     )
 
 
+async def trinn_exception_handler(request: Request, exc: TrinnError):
+    # exc.message embeds the underlying error (upstream details, internals) — keep it in
+    # the logs and return a generic message with the typed error_code instead.
+    if isinstance(exc, TrinnValidationError):
+        status_code, message = 400, "Invalid task parameters"
+    elif isinstance(exc, ExternalServiceError):
+        status_code, message = 502, "Upstream service failed during task execution"
+    else:
+        status_code, message = 502, "Task execution failed"
+    return error_response(
+        message=message,
+        status_code=status_code,
+        error_code=exc.error_code,
+        request_id=_request_id(request),
+    )
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(APIException, api_exception_handler)
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
     app.add_exception_handler(DealrError, dealr_exception_handler)
+    app.add_exception_handler(TrinnError, trinn_exception_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)
