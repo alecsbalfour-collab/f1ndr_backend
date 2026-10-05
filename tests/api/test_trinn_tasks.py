@@ -79,6 +79,7 @@ def test_run_scrape_failure_returns_502(client, headers_for, monkeypatch):
     assert resp.status_code == 502
     body = resp.json()
     assert body["success"] is False and body["error_code"] == "TRINN_ERROR"
+    assert "blocked" in body["details"]["reason"]
 
 
 def test_scheduler_status_endpoint(client, headers_for):

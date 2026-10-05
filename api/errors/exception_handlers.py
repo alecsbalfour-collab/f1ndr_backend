@@ -108,8 +108,9 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 
 async def trinn_exception_handler(request: Request, exc: TrinnError):
-    # exc.message embeds the underlying error (upstream details, internals) — keep it in
-    # the logs and return a generic message with the typed error_code instead.
+    # exc.message embeds the underlying error (upstream details, internals). Safe to
+    # surface in details here because every route that can raise TrinnError is behind
+    # require_scopes("tasks:admin") — it never reaches anonymous callers.
     if isinstance(exc, TrinnValidationError):
         status_code, message = 400, "Invalid task parameters"
     elif isinstance(exc, ExternalServiceError):
@@ -119,6 +120,7 @@ async def trinn_exception_handler(request: Request, exc: TrinnError):
     return error_response(
         message=message,
         status_code=status_code,
+        details={"reason": exc.message},
         error_code=exc.error_code,
         request_id=_request_id(request),
     )
