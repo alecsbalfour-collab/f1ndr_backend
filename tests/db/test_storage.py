@@ -99,7 +99,7 @@ async def test_document_store_and_modules_on_mongo(settings_env):
     from fastapi import FastAPI
     from listr.core.core import push_listing
     from listr.db.listing_repo import listings_store
-    from trinn.db.trinn_repo import get_task_repo
+    from trinn.db.trinn_repo import tasks_store
 
     settings_env.setenv("MONGODB_URI", uri)
     app = FastAPI()
@@ -107,7 +107,7 @@ async def test_document_store_and_modules_on_mongo(settings_env):
     database = connection_db.get_database()
     try:
         assert database is not None and database.name == TEST_DB
-        get_task_repo()
+        assert tasks_store._collection is not None
 
         store = DocumentStore(f"test_store_{uuid.uuid4().hex}")
         await _exercise_store(store)

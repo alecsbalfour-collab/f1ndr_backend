@@ -53,6 +53,32 @@ class ScheduleResult(Record):
     module_metadata: Dict[str, Any]
 
 
+class ScheduledTaskOut(Record):
+    """A scheduled trinn task: persisted fields plus live scheduler state when running."""
+    task_id: str
+    task: Optional[str] = None
+    task_data: Optional[Dict[str, Any]] = None
+    interval_hours: Optional[int] = None
+    next_run: Optional[str] = None
+    last_run: Optional[str] = None
+    run_count: int = 0
+    enabled: bool = True
+    status: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+class SchedulerStatus(Record):
+    """In-process scheduler state and counters (see trinn.utils.scheduler.get_scheduler_state)."""
+    status: str
+    dead_tasks: Optional[int] = None
+    total_scheduled_tasks: int = 0
+    active_tasks: int = 0
+    completed_runs: int = 0
+    failed_runs: int = 0
+    average_run_time_ms: float = 0.0
+    success_rate: float = 0.0
+
+
 class TrinnConfig(BaseModel):
     feature_key: str
     feature_version: str

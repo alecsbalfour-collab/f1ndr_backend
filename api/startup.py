@@ -16,11 +16,9 @@ async def on_startup(app: FastAPI) -> None:
     """Open the shared Mongo connection, hand it to every module, and start the scheduler."""
     if await connect_to_db(app):
         from dealr.db.client_db import attach_database
-        from trinn.db.trinn_repo import initialize_task_repo
 
         database = get_database()
         await apply_migrations(database)
-        initialize_task_repo(database)
         await attach_database(get_client(), database)
         await ensure_all_indexes()
         logger.info("Module storage initialized on MongoDB")
@@ -34,6 +32,7 @@ async def _start_scheduler() -> None:
     Only safe with a single worker: each process owns its own in-memory task
     table, so WORKERS>1 would both lose tasks and double-run them.
     """
+    from trinn.core.core import restore_scheduled_tasks
     from trinn.utils.scheduler import get_scheduler
 
     if get_settings().WORKERS > 1:
@@ -43,4 +42,5 @@ async def _start_scheduler() -> None:
         )
         return
     await get_scheduler().start()
+    await restore_scheduled_tasks()
     logger.info("Trinn scheduler started in-process (WORKERS=1 stopgap)")

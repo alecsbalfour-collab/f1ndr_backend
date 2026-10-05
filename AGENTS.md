@@ -58,7 +58,7 @@ Product shape: f1ndr is the main consumer app — scrape classifieds (Kijiji, Ma
 ### Before tester release (next)
 - [x] Two-level classification on inventory, sellr/listr listings and search filters: `category` (classifieds vertical: `vehicles`, `real_estate`, `goods`, `services`, `jobs`, `pets`, `community`, `other`; required on create) + `subcategory` (`car`, `truck`, `motorcycle`, `motorhome_a/b/c`, `travel_trailer`, `fifth_wheel`, `toy_hauler`, `truck_camper`, `other`; vehicle kinds only for now). Migration 0003 moves existing docs to `vehicles` + old value as `subcategory` (`car` when absent).
 - [x] Replace placeholders testers will hit: watchr alerts/subscriptions persisted per user (list/delete real), f1ndr `/vehicles` and `/listings/*` querying stored listings, market value returns `null` (not `0`) until Pricing lands so clients don't show $0. Also moved f1ndr listings off the in-memory list and dealr's `listing_service_core` off raw Motor — both now use `DocumentStore`; watchr gained the module contract (`run` + `get_watchr_config`).
-- [x] Scheduled trinn tasks never run (see Session 2 note): in-process stopgap landed — the lifespan starts `TrinnScheduler` only when `WORKERS<=1` (multi-worker would double-run; ARQ remains the real fix). Tasks are still in-memory only, so a restart forgets the schedule.
+- [x] Scheduled trinn tasks never run (see Session 2 note): in-process stopgap landed — the lifespan starts `TrinnScheduler` only when `WORKERS<=1` (multi-worker would double-run; ARQ remains the real fix). Schedules persist in `trinn_tasks` via `DocumentStore` and are re-registered on startup (`restore_scheduled_tasks`), so a restart keeps them. Admin task API: `GET/DELETE /trinn/tasks[/{id}]`, `GET /trinn/scheduler` for live state.
 - [x] A1 Password reset, pulled forward from Auth expansion: `POST /auth/password-reset/request` emails a single-use token (`auth_email_tokens`, `password_reset` purpose, `PASSWORD_RESET_EXPIRY_MINUTES` default 60, same 200 for unknown emails); `POST /auth/password-reset/confirm` sets the password, clears lockout, revokes all refresh sessions. `PASSWORD_RESET_URL` should point at the app's reset form.
 
 ### f1ndr corpus - scraped listings as the searchable product (next)
@@ -85,7 +85,7 @@ Product shape: f1ndr is the main consumer app — scrape classifieds (Kijiji, Ma
 - [x] Dockerfile: non-root user, `HEALTHCHECK`, multi-stage build.
 - [x] docker-compose: pin `mongo:7`, move `admin/admin` credentials to env. (Compose pins `mongo:8.3`; integration tests use `mongo:7`. Align when choosing the production version.)
 - [x] Split health into `/health/live` and `/health/ready` (Mongo ping, scheduler state). Liveness never checks dependencies; readiness returns 503 `NOT_READY`.
-- Note: the trinn scheduler now starts in the lifespan when `WORKERS<=1` (in-process stopgap). Scheduled tasks live in memory — restart loses them. Intended fix is the ARQ worker (Redis + background work item).
+- Note: the trinn scheduler now starts in the lifespan when `WORKERS<=1` (in-process stopgap). Scheduled tasks persist in `trinn_tasks` and are restored on startup, but the schedule itself is still per-process — WORKERS>1 leaves it stopped. Intended fix is the ARQ worker (Redis + background work item).
 
 ### Session 3+ - Enterprise features (Tier 3, one session each)
 - [x] Pydantic request/response models instead of `Dict[str, Any]` bodies (`api/schemas/` exists, unused). `/health` still returns untyped data (waiting on the live/ready split).

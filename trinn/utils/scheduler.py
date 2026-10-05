@@ -92,28 +92,30 @@ class TrinnScheduler:
         logger.info("Scheduler stopped")
     
     async def schedule_interval(
-        self, 
-        task_data: Dict[str, Any], 
+        self,
+        task_data: Dict[str, Any],
         interval_hours: int,
-        task_id: Optional[str] = None
+        task_id: Optional[str] = None,
+        next_run: Optional[datetime] = None,
     ) -> str:
         """
         Schedule a task to run at regular intervals.
-        
+
         Args:
             task_data: Task data to execute
             interval_hours: Interval between runs in hours
             task_id: Optional task ID (will be generated if not provided)
-            
+            next_run: Optional first run time (defaults to now + interval)
+
         Returns:
             Task ID of the scheduled task
         """
         if task_id is None:
             task_id = str(uuid.uuid4())
-        
+
         async with self._lock:
-            next_run = datetime.utcnow() + timedelta(hours=interval_hours)
-            
+            next_run = next_run or datetime.utcnow() + timedelta(hours=interval_hours)
+
             scheduled_task = ScheduledTask(
                 task_id=task_id,
                 task_data=task_data,
@@ -147,28 +149,54 @@ class TrinnScheduler:
                 return True
             return False
     
+    @staticmethod
+    def _task_snapshot(task: ScheduledTask) -> Dict[str, Any]:
+        return {
+            "task_id": task.task_id,
+            "task": task.task_data.get("task"),
+            "task_data": task.task_data,
+            "enabled": task.enabled,
+            "next_run": task.next_run.isoformat(),
+            "last_run": task.last_run.isoformat() if task.last_run else None,
+            "run_count": task.run_count,
+            "interval_hours": task.interval_hours,
+            "created_at": task.created_at.isoformat(),
+        }
+
     async def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """
         Get status of a scheduled task.
-        
+
         Args:
             task_id: Task ID to query
-            
+
         Returns:
             Task status dictionary or None if not found
         """
         async with self._lock:
             task = self.scheduled_tasks.get(task_id)
-            if task:
-                return {
-                    "task_id": task.task_id,
-                    "enabled": task.enabled,
-                    "next_run": task.next_run.isoformat(),
-                    "last_run": task.last_run.isoformat() if task.last_run else None,
-                    "run_count": task.run_count,
-                    "interval_hours": task.interval_hours,
-                }
-            return None
+            return self._task_snapshot(task) if task else None
+
+    async def list_tasks(self) -> list:
+        """Snapshot of every scheduled task, enabled or not."""
+        async with self._lock:
+            return [self._task_snapshot(task) for task in self.scheduled_tasks.values()]
+
+    async def remove_task(self, task_id: str) -> bool:
+        """
+        Remove a scheduled task entirely (disable + drop from the table).
+
+        Returns:
+            True if the task existed
+        """
+        async with self._lock:
+            task = self.scheduled_tasks.pop(task_id, None)
+            if task is None:
+                return False
+            if task.enabled:
+                self.metrics.active_tasks -= 1
+            logger.info(f"Removed task {task_id}")
+            return True
     
     async def _scheduler_loop(self) -> None:
         """Main scheduler loop to check for due tasks."""

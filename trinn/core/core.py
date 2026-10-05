@@ -9,7 +9,7 @@ from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
 
 from trinn.config.config import get_trinn_config
-from trinn.db.trinn_repo import get_task_repo
+from trinn.db.trinn_repo import tasks_store
 from trinn.utils.scheduler import get_scheduler
 from trinn.core.exceptions_core import TrinnError, ValidationError
 from scrapers.module import SCRAPER_CLASSES, run_scraper
@@ -133,15 +133,25 @@ async def schedule_task(data: Dict[str, Any]) -> Dict[str, Any]:
     try:
         # Calculate next run time
         next_run = datetime.utcnow() + timedelta(hours=interval)
-        
+
         # Schedule the task
-        task_id = await get_scheduler().schedule_interval(data, interval)
-        
-        # Save task to database when a repository has been initialized
+        task_id = await get_scheduler().schedule_interval(data, interval, next_run=next_run)
+
+        # Persist so the schedule survives a restart (best-effort: Mongo or in-memory)
         try:
-            await get_task_repo().insert({**data, "task_id": task_id})
-        except RuntimeError:
-            logger.warning("Task repository not initialized; task scheduled in memory only")
+            await tasks_store.upsert({
+                "task_id": task_id,
+                "task": data.get("task"),
+                "task_data": data,
+                "interval_hours": interval,
+                "next_run": next_run.isoformat(),
+                "enabled": True,
+                "status": "scheduled",
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat(),
+            })
+        except Exception as e:
+            logger.warning(f"Task {task_id} scheduled in memory only; persistence failed: {e}")
         
         return {
             "scheduled": True,
@@ -155,6 +165,65 @@ async def schedule_task(data: Dict[str, Any]) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Task scheduling failed: {e}")
         raise TrinnError(f"Task scheduling failed: {str(e)}")
+
+
+def _merge_live(doc: Dict[str, Any], live: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Overlay live scheduler fields (next_run, run_count, last_run, enabled) onto a persisted doc."""
+    return {**doc, **live} if live else doc
+
+
+async def list_scheduled_tasks() -> list:
+    """
+    All known scheduled tasks: persisted documents overlaid with live scheduler state,
+    plus any tasks only held in memory (persistence unavailable when they were scheduled).
+    """
+    scheduler = get_scheduler()
+    live_by_id = {t["task_id"]: t for t in await scheduler.list_tasks()}
+    tasks = []
+    seen = set()
+    for doc in await tasks_store.find(sort=("created_at", -1)):
+        seen.add(doc["task_id"])
+        tasks.append(_merge_live(doc, live_by_id.pop(doc["task_id"], None)))
+    tasks.extend(live_by_id.values())
+    return tasks
+
+
+async def get_scheduled_task(task_id: str) -> Optional[Dict[str, Any]]:
+    """One scheduled task (persisted + live state), or None if unknown."""
+    doc = await tasks_store.get(task_id)
+    live = await get_scheduler().get_task_status(task_id)
+    if doc is None and live is None:
+        return None
+    return _merge_live(doc or {}, live)
+
+
+async def delete_scheduled_task(task_id: str) -> bool:
+    """Remove a task from the scheduler and the store. Returns False if it never existed."""
+    removed = await get_scheduler().remove_task(task_id)
+    deleted = await tasks_store.delete(task_id)
+    return removed or deleted
+
+
+async def restore_scheduled_tasks() -> int:
+    """Re-register persisted tasks with the in-process scheduler after a restart."""
+    scheduler = get_scheduler()
+    restored = 0
+    for doc in await tasks_store.find({"enabled": True, "status": "scheduled"}):
+        task_data = doc.get("task_data") or {}
+        try:
+            next_run = datetime.fromisoformat(doc["next_run"]) if doc.get("next_run") else None
+            await scheduler.schedule_interval(
+                task_data,
+                doc.get("interval_hours") or task_data.get("interval") or get_trinn_config()["default_interval_hours"],
+                task_id=doc["task_id"],
+                next_run=next_run,
+            )
+            restored += 1
+        except Exception as e:
+            logger.error(f"Failed to restore scheduled task {doc.get('task_id')}: {e}")
+    if restored:
+        logger.info(f"Restored {restored} scheduled trinn tasks")
+    return restored
 
 
 async def schedule_sync(data: Dict[str, Any], interval_hours: int) -> Dict[str, Any]:
