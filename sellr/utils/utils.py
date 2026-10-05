@@ -21,6 +21,7 @@ async def save_listing(listing: Dict[str, Any]) -> str:
     now = datetime.utcnow().isoformat()
     listing_id = listing.get("id") or str(uuid.uuid4())
     listing["category"] = listing.get("category") or "other"
+    listing["status"] = listing.get("status") or "active"  # keep the response in step with the stored doc
     await listings_store.upsert({
         **listing,
         "id": listing_id,
