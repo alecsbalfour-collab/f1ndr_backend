@@ -32,24 +32,37 @@ async def run_task(data: Dict[str, Any]) -> Dict[str, Any]:
     """
     config = get_trinn_config()
     task_type = data.get("task")
-    
+
     logger.info(f"Executing TRINN task: {task_type}")
-    
+
     try:
-        if task_type == "scrape" and config["enable_scraper_tasks"]:
+        _require_task_enabled(task_type, config)
+        if task_type == "scrape":
             return await _execute_scrape_task(data, config)
-        elif task_type == "vin" and config["enable_vin_tasks"]:
+        elif task_type == "vin":
             return await _execute_vin_task(data, config)
-        elif task_type == "sync" and config["enable_listing_sync"]:
-            return await _execute_sync_task(data, config)
         else:
-            raise ValidationError(f"Invalid or disabled trinn task: {task_type}")
+            return await _execute_sync_task(data, config)
 
     except TrinnError:
         raise
     except Exception as e:
         logger.error(f"Task execution failed: {e}")
         raise TrinnError(f"Task execution failed: {str(e)}")
+
+
+_TASK_FLAGS = {
+    "scrape": "enable_scraper_tasks",
+    "vin": "enable_vin_tasks",
+    "sync": "enable_listing_sync",
+}
+
+
+def _require_task_enabled(task_type: Optional[str], config: Dict[str, Any]) -> None:
+    """Reject unknown task types and tasks disabled via config flags."""
+    flag = _TASK_FLAGS.get(task_type)
+    if flag is None or not config[flag]:
+        raise ValidationError(f"Invalid or disabled trinn task: {task_type}")
 
 
 async def _execute_scrape_task(data: Dict[str, Any], config) -> Dict[str, Any]:
@@ -128,10 +141,11 @@ async def schedule_task(data: Dict[str, Any]) -> Dict[str, Any]:
         Dictionary with scheduling confirmation and metadata
     """
     config = get_trinn_config()
+    _require_task_enabled(data.get("task"), config)
     interval = data.get("interval", config["default_interval_hours"])
-    
+
     logger.info(f"Scheduling TRINN task with interval: {interval} hours")
-    
+
     try:
         # Calculate next run time
         next_run = datetime.utcnow() + timedelta(hours=interval)

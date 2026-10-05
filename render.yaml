@@ -36,6 +36,9 @@ services:
         value: "f1ndr <notifications@f1ndr.ca>"
       - key: LOG_LEVEL
         value: info
+      # Chromium exceeds 512MB: scraping runs in GitHub Actions, not here.
+      - key: ENABLE_SCRAPER_TASKS
+        value: "false"
       # Keep 1: the in-process scheduler stopgap only runs single-worker.
       - key: WORKERS
         value: "1"
