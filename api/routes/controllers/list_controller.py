@@ -6,8 +6,17 @@ DICT-aligned list controller with FlutterFlow compatibility and enterprise featu
 import logging
 from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, Query
-from api.schemas.common import Page, paged
-from api.schemas.list_schemas import Category, ComparisonGroup, OptCategory, OptSubcategory, Subcategory, VehicleOut
+from api.schemas.common import Envelope, Page, ok, paged
+from api.schemas.list_schemas import (
+    Category,
+    ComparisonGroup,
+    ExternalSearchLink,
+    OptCategory,
+    OptSubcategory,
+    Subcategory,
+    VehicleOut,
+)
+from f1ndr.data.external_search import external_search_links
 from f1ndr.db.db import listings_store as f1ndr_store
 from f1ndr.utils.utils import group_equivalent_listings
 from listr.db.listing_repo import listings_store as listr_store
@@ -116,6 +125,22 @@ async def get_comparison_groups(
     total = len(groups)
     results = groups[(page - 1) * page_size: page * page_size]
     return paged(results, total, page, page_size, "Comparison groups retrieved")
+
+
+@router.get("/external", response_model=Envelope[List[ExternalSearchLink]])
+async def get_external_search_links(
+    search: Optional[str] = Query(None, max_length=200),
+    category: OptCategory = None,
+    region: Optional[str] = Query(None, max_length=100),
+    min_price: Optional[float] = Query(None, ge=0),
+    max_price: Optional[float] = Query(None, ge=0),
+):
+    """Links that open the same search on platforms f1ndr doesn't collect data from.
+
+    Currently Facebook Marketplace, whose terms forbid scraping. Show these as
+    buttons next to the unified/compare results; they open in the user's browser or app.
+    """
+    return ok(external_search_links(search, region, category, min_price, max_price), "External search links")
 
 
 # Platform spellings differ between listr pushes and scraper source names.

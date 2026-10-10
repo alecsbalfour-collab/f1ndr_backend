@@ -21,10 +21,10 @@ async def test_push_truncates_title():
 
 
 async def test_update_then_remove_roundtrip():
-    pushed = (await push_listing("facebook", {"title": "A"}))["listing"]
-    assert (await update_listing("facebook", {**pushed, "title": "B"}))["status"] == "updated"
-    assert (await remove_listing("facebook", pushed))["status"] == "removed"
-    assert (await remove_listing("facebook", pushed))["status"] == "not_found"
+    pushed = (await push_listing("craigslist", {"title": "A"}))["listing"]
+    assert (await update_listing("craigslist", {**pushed, "title": "B"}))["status"] == "updated"
+    assert (await remove_listing("craigslist", pushed))["status"] == "removed"
+    assert (await remove_listing("craigslist", pushed))["status"] == "not_found"
 
 
 async def test_unsupported_platform_rejected():

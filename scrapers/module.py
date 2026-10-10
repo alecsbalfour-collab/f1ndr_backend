@@ -14,10 +14,8 @@ from scrapers.core.metrics_core import metrics_registry
 from scrapers.core.resilience_core import breaker_registry
 from scrapers.craigslist_scraper import CraigslistScraper
 from scrapers.ebay_scraper import EbayScraper
-from scrapers.facebook_scraper import FacebookMarketplaceScraper
 from scrapers.kijiji_scraper import KijijiScraper
 from scrapers.locanto_scraper import LocantoScraper
-from scrapers.marketplace_scraper import MarketplaceScraper
 from scrapers.neighbourhood_scraper import NeighbourhoodScraper
 from scrapers.realtor_scraper import RealtorScraper
 from scrapers.rentals_scraper import RentalsScraper
@@ -27,14 +25,14 @@ from scrapers.usedca_scraper import UsedCAScraper
 from scrapers.zillow_scraper import ZillowScraper
 
 
+# Facebook Marketplace is deliberately absent: Meta's terms forbid automated collection
+# (logged in or not). f1ndr links out to it instead (f1ndr/data/external_search.py).
 SCRAPER_CLASSES: Dict[str, Type[BaseScraper]] = {
     "autotrader": AutotraderScraper,
     "craigslist": CraigslistScraper,
     "ebay": EbayScraper,
-    "facebook": FacebookMarketplaceScraper,
     "kijiji": KijijiScraper,
     "locanto": LocantoScraper,
-    "marketplace": MarketplaceScraper,
     "neighbourhood": NeighbourhoodScraper,
     "realtor": RealtorScraper,
     "rentals": RentalsScraper,

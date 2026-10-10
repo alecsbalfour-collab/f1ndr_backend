@@ -133,8 +133,8 @@ DELETE /api/v1/sellr/listings/{id}
 ### LISTR (Platform Integration)
 ```http
 GET /api/v1/listr/status
-POST /api/v1/listr/listings?platform=facebook
-PUT /api/v1/listr/listings/{id}?platform=facebook
+POST /api/v1/listr/listings?platform=kijiji
+PUT /api/v1/listr/listings/{id}?platform=kijiji
 GET /api/v1/listr/platforms
 ```
 

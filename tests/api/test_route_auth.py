@@ -33,6 +33,7 @@ PUBLIC_ROUTES = {
     ("GET", "/scrapers/platforms"),
     ("GET", "/listings/unified"),
     ("GET", "/listings/compare"),
+    ("GET", "/listings/external"),
     ("GET", "/listings/raw/facebook"),
     ("GET", "/listings/raw/kijiji"),
     ("GET", "/listings/raw/craigslist"),

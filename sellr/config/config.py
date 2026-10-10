@@ -18,7 +18,7 @@ def get_sellr_config() -> dict:
         "enable_vin_validation": True,
 
         "allow_multi_platform": True,
-        "default_platforms": ["kijiji", "facebook", "autotrader"],
+        "default_platforms": ["kijiji", "autotrader"],
 
         "auto_price": True,
         "price_floor_percent": 0.85,

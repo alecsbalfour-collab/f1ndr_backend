@@ -17,7 +17,7 @@ def get_listings_config() -> dict:
 
         # Marketplace sync
         "allow_multi_platform": True,
-        "default_platforms": ["kijiji", "facebook", "autotrader"],
+        "default_platforms": ["kijiji", "autotrader"],
 
         # Pricing intelligence
         "auto_price": True,

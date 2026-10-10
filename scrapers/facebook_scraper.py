@@ -1,5 +1,7 @@
 """
-Facebook Marketplace scraper (Calgary vehicles).
+Facebook Marketplace scraper (Calgary vehicles). NOT REGISTERED in scrapers.module:
+Meta's terms forbid automated collection, so f1ndr links out to Marketplace instead
+(f1ndr/data/external_search.py). Do not re-add it without Meta's written permission.
 
 Marketplace cards are anchors to /marketplace/item/<id>/ whose text spans are
 ordered price, title, location, mileage. Facebook frequently serves a login wall

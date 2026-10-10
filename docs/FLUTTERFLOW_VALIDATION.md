@@ -223,7 +223,7 @@ curl -X POST http://localhost:8000/api/trinn/run \
 curl -X POST http://localhost:8000/api/trinn/schedule \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <token>" \
-  -d '{"task":"sync","platform":"facebook","interval":24}'
+  -d '{"task":"sync","platform":"kijiji","interval":24}'
 ```
 
 ### VIN Decoding

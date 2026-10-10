@@ -5,11 +5,13 @@ environment/secret settings only, never in chat or git. Tick items off as they a
 
 ## Needed to start testing
 
-- [ ] **SMTP / email provider** for `notifications@f1ndr.ca`: verification emails, password reset (A1), email codes (A4).
-  - Produces: host, port, username, password -> `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `EMAIL_FROM`.
-- [ ] **Test-environment MongoDB** (e.g. Atlas), with its own database user.
+- [x] **SMTP / email provider** for `notifications@f1ndr.ca`: verification emails, password reset (A1), email codes (A4), watchr alerts.
+  - **Brevo.** `SMTP_HOST=smtp-relay.brevo.com`, `SMTP_PORT=587` (STARTTLS), `SMTP_USERNAME` = the SMTP login on Brevo's SMTP page, `SMTP_PASSWORD` = an SMTP key (not an `xkeysib-` API key). `EMAIL_FROM` defaults to `f1ndr <notifications@f1ndr.ca>`.
+  - Set in Render (API) and as GitHub repo secrets (scrape runner).
+  - [x] `f1ndr.ca` authenticated in Brevo (Brevo code + DKIM + DMARC DNS records); `notifications@f1ndr.ca` added as a sender. Without DMARC, Outlook/Hotmail recipients get spam-foldered or rejected.
+- [x] **MongoDB**, connected to the deployed API.
   - Produces: connection string -> `MONGODB_URI`, `MONGODB_DB_NAME`.
-- [ ] **Hosting** for the test backend (Render, Docker on a VPS, ...): somewhere to set the environment variables.
+- [x] **Hosting**: Render, Docker service `f1ndr_backend_docker` (`https://f1ndr-backend-docker.onrender.com`). The old `f1ndr-backend` service is suspended.
   - Also set: `ENVIRONMENT`, `JWT_SECRET_KEY` (48+ random chars), `CORS_ORIGINS`, `FLUTTERFLOW_API_KEY`, `ADMIN_EMAILS`.
 - [ ] **Rotate the secrets** that were in the `.env` committed in `0756fc7`/`1de097f` (Mongo, JWT, SMTP, API keys).
 
@@ -27,9 +29,10 @@ environment/secret settings only, never in chat or git. Tick items off as they a
 
 ## Two-step verification (roadmap A3-A5)
 
-- [ ] **Twilio**, using the **Verify** product, for SMS codes (A5).
-  - Upgrade from trial (trial can only text verified numbers); restrict to Canada/US; enable Fraud Guard.
-  - Produces: Account SID, Auth Token, Verify Service SID.
+- [ ] **Twilio** account, for SMS codes (A5) via the **Verify** product. Nothing reads these yet; A5 lands after A2-A4.
+  - [ ] Upgraded from trial (trial can only text verified numbers).
+  - [ ] Verify Service created; geo permissions restricted to Canada/US; Fraud Guard on.
+  - Produces: Account SID, Auth Token, Verify Service SID -> `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_VERIFY_SERVICE_SID` (names A5 will read).
   - SMS is never the only second factor; TOTP authenticator apps (A3) need no external account.
 - Email codes (A4) reuse the SMTP account above.
 

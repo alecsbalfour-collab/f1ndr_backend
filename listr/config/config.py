@@ -9,7 +9,6 @@ def get_listr_config() -> dict:
         "enabled": True,
         "supported_platforms": [
             "kijiji",
-            "facebook",
             "autotrader",
             "craigslist",
             "ebay"

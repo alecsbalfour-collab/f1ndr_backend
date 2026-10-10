@@ -348,6 +348,36 @@ async def test_notification_retry_skipped_without_smtp(mailer, monkeypatch):
     assert record["notify_attempts"] == 1 and record["notify_pending"] is True
 
 
+def test_facebook_marketplace_links():
+    from f1ndr.data.external_search import facebook_marketplace_url as fb
+
+    base = "https://www.facebook.com/marketplace"
+    assert fb("honda civic", "calgary", min_price=5000, max_price=15000.0) == (
+        f"{base}/calgary/search?minPrice=5000&maxPrice=15000&query=honda+civic"
+    )
+    assert fb(region="Red Deer", category="vehicles") == f"{base}/reddeer/vehicles"
+    assert fb(category="vehicles") == f"{base}/category/vehicles"  # user's own location
+    assert fb("  ", "calgary", category="goods") == f"{base}/calgary"
+    assert fb() == base
+
+
+def test_external_links_endpoint(client):
+    resp = client.get(f"{API}/listings/external", params={"search": "civic", "region": "calgary", "category": ""})
+    assert resp.status_code == 200
+    [link] = resp.json()["data"]
+    assert link["platform"] == "facebook_marketplace"
+    assert link["url"] == "https://www.facebook.com/marketplace/calgary/search?query=civic"
+
+
+def test_facebook_marketplace_is_never_scraped(client, headers_for):
+    """Meta's terms forbid automated collection; it's a link-out only."""
+    from scrapers.module import SCRAPER_CLASSES
+
+    assert not [name for name, cls in SCRAPER_CLASSES.items() if "facebook.com" in cls.base_url]
+    resp = client.post(f"{API}/scrapers/search", json={"platforms": ["facebook"]}, headers=headers_for("admin"))
+    assert resp.status_code == 422
+
+
 @pytest.mark.asyncio
 async def test_matches_route_scoped_to_user(client, headers_for):
     from watchr.core import core as watchr_core

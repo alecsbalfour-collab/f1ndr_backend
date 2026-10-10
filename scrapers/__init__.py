@@ -3,10 +3,8 @@ from .module import SCRAPER_CLASSES, health_report, run_all, run_scraper
 from .autotrader_scraper import run as run_autotrader
 from .craigslist_scraper import run as run_craigslist
 from .ebay_scraper import run as run_ebay
-from .facebook_scraper import run as run_facebook
 from .kijiji_scraper import run as run_kijiji
 from .locanto_scraper import run as run_locanto
-from .marketplace_scraper import run as run_marketplace
 from .neighbourhood_scraper import run as run_neighbourhood
 from .realtor_scraper import run as run_realtor
 from .rentals_scraper import run as run_rentals
@@ -19,10 +17,8 @@ from .zillow_scraper import run as run_zillow
 scrape_autotrader = run_autotrader
 scrape_craigslist = run_craigslist
 scrape_ebay = run_ebay
-scrape_facebook = run_facebook
 scrape_kijiji = run_kijiji
 scrape_locanto = run_locanto
-scrape_marketplace = run_marketplace
 scrape_neighbourhood = run_neighbourhood
 scrape_realtor = run_realtor
 scrape_rentals = run_rentals
@@ -42,10 +38,8 @@ __all__ = [
     "run_autotrader",
     "run_craigslist",
     "run_ebay",
-    "run_facebook",
     "run_kijiji",
     "run_locanto",
-    "run_marketplace",
     "run_neighbourhood",
     "run_realtor",
     "run_rentals",
@@ -58,10 +52,8 @@ __all__ = [
     "scrape_autotrader",
     "scrape_craigslist",
     "scrape_ebay",
-    "scrape_facebook",
     "scrape_kijiji",
     "scrape_locanto",
-    "scrape_marketplace",
     "scrape_neighbourhood",
     "scrape_realtor",
     "scrape_rentals",

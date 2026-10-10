@@ -43,7 +43,7 @@ class TrinnConfig:
     
     def __post_init__(self):
         if self.supported_platforms is None:
-            self.supported_platforms = ["kijiji", "facebook", "autotrader", "craigslist", "ebay"]
+            self.supported_platforms = ["kijiji", "autotrader", "craigslist", "ebay"]
 
 
 def get_trinn_config() -> Dict[str, Any]:

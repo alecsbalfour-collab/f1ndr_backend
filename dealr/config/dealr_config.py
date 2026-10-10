@@ -27,7 +27,7 @@ DEALR_CONFIG = {
     },
     "enable_vin_decode": True,
     "enable_market_value": True,
-    "default_platforms": ["kijiji", "facebook", "autotrader"],
+    "default_platforms": ["kijiji", "autotrader"],
     "sync_interval_hours": 24,
 }
 

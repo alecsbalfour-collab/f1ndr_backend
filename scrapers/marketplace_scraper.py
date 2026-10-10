@@ -1,6 +1,6 @@
 """
 Facebook Marketplace scraper (Calgary, all categories).
-Shares card parsing with the vehicles scraper.
+Shares card parsing with the vehicles scraper. NOT REGISTERED: see facebook_scraper.py.
 """
 
 from typing import Any, Dict, Optional

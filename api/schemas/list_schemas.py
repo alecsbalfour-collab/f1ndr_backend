@@ -78,6 +78,13 @@ class VehicleOut(Record):
     first_seen_at: Optional[str] = None
 
 
+class ExternalSearchLink(BaseModel):
+    """A link that opens the same search on a platform f1ndr doesn't collect from."""
+    platform: str
+    label: str
+    url: str
+
+
 class ComparisonGroup(Record):
     """Listings believed to be the same item across platforms/sellers."""
     key: str
