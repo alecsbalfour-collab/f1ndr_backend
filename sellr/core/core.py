@@ -1,3 +1,5 @@
+import uuid
+
 from sellr.config.config import get_listings_config
 from f1ndr.vin.decode import decode_vin
 from f1ndr.intelligence.market import compute_market_value
@@ -65,7 +67,8 @@ async def schedule_listing_sync(listing: dict, config: dict):
 async def create_listing(data: dict) -> dict:
     config = get_listings_config()
 
-    listing = validate_listing(data, config)
+    # Assigned up front so the sync task can reference the listing; save_listing keeps it.
+    listing = {**validate_listing(data, config), "id": data.get("id") or str(uuid.uuid4())}
     listing = autofill_from_vin(listing, config)
     listing = apply_auto_pricing(listing, config)
     await push_to_marketplaces(listing, config)

@@ -123,9 +123,15 @@ class TrinnScheduler:
                 next_run=next_run,
                 created_at=datetime.utcnow(),
             )
-            
+
+            # Re-scheduling an existing ID replaces it; only count genuinely new tasks.
+            existing = self.scheduled_tasks.get(task_id)
+            if existing is None:
+                self.metrics.total_scheduled_tasks += 1
+            elif existing.enabled:
+                existing.enabled = False  # a queued copy of the old version must not run
+                self.metrics.active_tasks -= 1
             self.scheduled_tasks[task_id] = scheduled_task
-            self.metrics.total_scheduled_tasks += 1
             self.metrics.active_tasks += 1
             
             logger.info(f"Scheduled task {task_id} to run at {next_run}")

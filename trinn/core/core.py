@@ -130,13 +130,19 @@ async def _execute_sync_task(data: Dict[str, Any], config) -> Dict[str, Any]:
         raise TrinnError(f"Sync task failed: {str(e)}")
 
 
-async def schedule_task(data: Dict[str, Any]) -> Dict[str, Any]:
+async def schedule_task(
+    data: Dict[str, Any],
+    task_id: Optional[str] = None,
+    listing_id: Optional[str] = None,
+) -> Dict[str, Any]:
     """
     Schedule TRINN task with enterprise scheduling logic.
     
     Args:
         data: Task data containing scheduling parameters
-        
+        task_id: Stable ID; scheduling the same ID again replaces the task
+        listing_id: Listing the task belongs to, so deleting the listing cancels it
+
     Returns:
         Dictionary with scheduling confirmation and metadata
     """
@@ -151,13 +157,14 @@ async def schedule_task(data: Dict[str, Any]) -> Dict[str, Any]:
         next_run = datetime.utcnow() + timedelta(hours=interval)
 
         # Schedule the task
-        task_id = await get_scheduler().schedule_interval(data, interval, next_run=next_run)
+        task_id = await get_scheduler().schedule_interval(data, interval, task_id=task_id, next_run=next_run)
 
         # Persist so the schedule survives a restart (best-effort: Mongo or in-memory)
         try:
             await tasks_store.upsert({
                 "task_id": task_id,
                 "task": data.get("task"),
+                "listing_id": listing_id,
                 "task_data": data,
                 "interval_hours": interval,
                 "next_run": next_run.isoformat(),
@@ -242,22 +249,46 @@ async def restore_scheduled_tasks() -> int:
     return restored
 
 
+def sync_task_id(platform: str, listing_id: str) -> str:
+    """One sync task per (platform, listing): rescheduling replaces it instead of piling up."""
+    return f"sync:{platform}:{listing_id}"
+
+
 async def schedule_sync(data: Dict[str, Any], interval_hours: int) -> Dict[str, Any]:
     """
     Schedule sync task with enterprise logic.
-    
+
+    Skipped (not an error) when listing sync is disabled or the listing has no
+    target platform or ID: such a task could never run, and callers like sellr
+    listing creation must not fail because of it.
+
     Args:
         data: Sync task data
         interval_hours: Scheduling interval in hours
-        
+
     Returns:
-        Dictionary with scheduling confirmation
+        Dictionary with scheduling confirmation (`scheduled: False` when skipped)
     """
+    platform, listing_id = data.get("platform"), data.get("id")
+    if not (platform and listing_id and get_trinn_config()["enable_listing_sync"]):
+        return {"scheduled": False, "status": "skipped"}
+
     sync_data = {
         "task": "sync",
-        "platform": data.get("platform"),
+        "platform": platform,
         "listing": data,
         "interval": interval_hours,
     }
-    
-    return await schedule_task(sync_data)
+
+    return await schedule_task(sync_data, task_id=sync_task_id(platform, listing_id), listing_id=listing_id)
+
+
+async def cancel_listing_sync(listing_id: str) -> int:
+    """Remove every scheduled task tied to a listing (call when it's deleted). Never raises."""
+    removed = 0
+    try:
+        for doc in await tasks_store.find({"listing_id": listing_id}):
+            removed += await delete_scheduled_task(doc["task_id"])
+    except Exception as e:
+        logger.error(f"Failed to cancel sync tasks for listing {listing_id}: {e}")
+    return removed

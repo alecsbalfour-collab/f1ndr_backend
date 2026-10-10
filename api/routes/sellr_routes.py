@@ -14,6 +14,7 @@ from utils.response_builder import error_response
 from sellr.config.config import get_listings_config
 from sellr.core.core import create_listing
 from sellr.utils.utils import save_listing, update_listing, delete_listing, get_listing, list_listings
+from trinn.core.core import cancel_listing_sync
 
 
 logger = logging.getLogger(__name__)
@@ -175,4 +176,5 @@ async def delete_listing_endpoint(listing_id: str, claims: Dict[str, Any] = Depe
     
     if not await _owned(listing_id, claims) or not await delete_listing(listing_id):
         return _not_found()
+    await cancel_listing_sync(listing_id)
     return ok(message="Listing deleted successfully")

@@ -14,6 +14,7 @@ from utils.response_builder import error_response
 from dealr.config.dealr_config import dealr_config
 from dealr.core.core import ingest_inventory, sync_inventory
 from dealr.db import inventory_repo
+from trinn.core.core import cancel_listing_sync
 
 
 logger = logging.getLogger(__name__)
@@ -134,4 +135,5 @@ async def delete_inventory(inventory_id: str, claims: Dict[str, Any] = Depends(_
     existing = await inventory_repo.get_inventory(inventory_id)
     if existing is None or not owns(claims, existing, "owner_id") or not await inventory_repo.delete_inventory(inventory_id):
         return _not_found()
+    await cancel_listing_sync(inventory_id)
     return ok(message="Inventory deleted successfully")

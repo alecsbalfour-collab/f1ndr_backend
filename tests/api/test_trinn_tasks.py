@@ -10,7 +10,13 @@ from api.main import app
 from api.router_api import API_V1_PREFIX
 from api.startup import on_startup
 from api.shutdown import on_shutdown
-from trinn.core.core import delete_scheduled_task, restore_scheduled_tasks, schedule_task
+from trinn.core.core import (
+    delete_scheduled_task,
+    restore_scheduled_tasks,
+    schedule_sync,
+    schedule_task,
+    sync_task_id,
+)
 from trinn.db.trinn_repo import tasks_store
 from trinn.utils.scheduler import get_scheduler
 
@@ -106,6 +112,48 @@ async def test_persisted_tasks_restore_on_startup():
             await on_shutdown(app2)
     finally:
         await delete_scheduled_task(task_id)
+
+
+def _create_sellr(client, headers, **extra):
+    resp = client.post(
+        f"{API_V1_PREFIX}/sellr/listings",
+        json={"title": "Bike", "price": 100, "category": "goods", **extra},
+        headers=headers,
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()["data"]["id"]
+
+
+async def test_listing_without_platform_schedules_nothing(client, headers_for):
+    before = await tasks_store.count({"task": "sync"})
+    listing_id = _create_sellr(client, headers_for("user", sub="sync-u1"))
+    assert await tasks_store.count({"task": "sync"}) == before
+    assert await tasks_store.count({"listing_id": listing_id}) == 0
+
+
+async def test_disabled_listing_sync_does_not_block_listing_creation(client, headers_for, monkeypatch):
+    monkeypatch.setenv("ENABLE_LISTING_SYNC", "false")
+    listing_id = _create_sellr(client, headers_for("user", sub="sync-u2"), platform="kijiji")
+    assert await tasks_store.count({"listing_id": listing_id}) == 0
+
+
+async def test_listing_sync_task_is_unique_and_removed_with_listing(client, headers_for):
+    headers = headers_for("user", sub="sync-u3")
+    listing_id = _create_sellr(client, headers, platform="kijiji")
+    task_id = sync_task_id("kijiji", listing_id)
+    doc = await tasks_store.get(task_id)
+    assert doc and doc["listing_id"] == listing_id and doc["task_data"]["listing"]["id"] == listing_id
+
+    # Re-scheduling the same listing replaces its task rather than adding another.
+    active_before = get_scheduler().metrics.active_tasks
+    await schedule_sync({**doc["task_data"]["listing"], "title": "Bike v2"}, 24)
+    assert await tasks_store.count({"listing_id": listing_id}) == 1
+    assert get_scheduler().metrics.active_tasks == active_before
+    assert get_scheduler().scheduled_tasks[task_id].task_data["listing"]["title"] == "Bike v2"
+
+    assert client.delete(f"{API_V1_PREFIX}/sellr/listings/{listing_id}", headers=headers).status_code == 200
+    assert await tasks_store.get(task_id) is None
+    assert task_id not in get_scheduler().scheduled_tasks
 
 
 async def test_deleted_task_not_restored():
