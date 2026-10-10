@@ -11,7 +11,7 @@
 - Settings: `api/config/settings_config.py` (`MONGODB_URI`, `MONGODB_DB_NAME`, `JWT_SECRET_KEY`, `MONGODB_REQUIRED`). Don't reintroduce `MONGO_URI`/`JWT_SECRET`.
 - Modules persist through `db/document_store.py` `DocumentStore`: Mongo when connected, in-memory otherwise (tests, dev without Mongo). Production (`ENVIRONMENT=production`) fails startup if Mongo is unreachable.
 - `TestClient(app)` without `with` skips the lifespan, so tests stay in-memory. Mongo integration tests only run when `MONGODB_URI` is set in the process env (never read from `.env`, which points at real data).
-- Local throwaway Mongo for integration tests: `docker run -d --rm --name f1ndr-test-mongo -p 27099:27017 mongo:7`, then run pytest with `MONGODB_URI=mongodb://127.0.0.1:27099`. Ports 27017/27018 are the user's own containers.
+- Local throwaway Mongo for integration tests: `docker run -d --rm --name f1ndr-test-mongo -p 27099:27017 mongo:7`, then run pytest with `MONGODB_URI=mongodb://127.0.0.1:27099`. Ports 27017/27018 are the user's own containers. Scope it to the integration tests (`tests/db`, `tests/api/test_auth.py::test_auth_services_on_mongo`): the whole suite with `MONGODB_URI` set cascades into ~100 "Event loop is closed"/500 failures (a Mongo test leaves the global Motor client bound to a closed loop; pre-existing, unfixed).
 
 ## Auth
 - Services live in `api/auth/` (`accounts`, `tokens`, `roles`, `audit`, `email`, `store`); `api/routes/auth_routes.py` is thin HTTP glue. `api/auth` must not import `api.routes`.
