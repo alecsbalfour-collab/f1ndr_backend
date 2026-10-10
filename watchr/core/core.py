@@ -5,7 +5,7 @@ Watchr core functions used by other modules and the API routes.
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 from db.document_store import DocumentStore
@@ -17,7 +17,12 @@ logger = logging.getLogger(__name__)
 
 alerts_store = DocumentStore("watchr_alerts", key="alert_id", indexes=("listing_id", "subscriber", "user_id"))
 subscriptions_store = DocumentStore("watchr_subscriptions", key="subscription_id", indexes=("user_id",))
-matches_store = DocumentStore("watchr_matches", key="id", indexes=("user_id", "alert_id", "listing_id"))
+matches_store = DocumentStore("watchr_matches", key="id", indexes=("user_id", "alert_id", "listing_id", "notify_pending"))
+
+# Failed alert emails are retried by retry_pending_notifications up to this many
+# total attempts, and only while the match (or price drop) is recent enough to matter.
+MAX_NOTIFY_ATTEMPTS = 5
+NOTIFY_RETRY_WINDOW = timedelta(days=3)
 
 
 def _timestamps() -> dict:
@@ -171,6 +176,20 @@ async def _notify_match(alert: dict, listing: dict, dropped_from: Optional[float
     return await send_email(user["email"], subject, body)
 
 
+async def _deliver(
+    match_id: str, alert: dict, listing: dict, dropped_from: Optional[float] = None, attempts: int = 1
+) -> bool:
+    """Send the match email and record the outcome; failures stay pending for retry."""
+    sent = await _notify_match(alert, listing, dropped_from)
+    await matches_store.update(match_id, {
+        "notified": sent,
+        "notify_pending": not sent and attempts < MAX_NOTIFY_ATTEMPTS,
+        "notify_attempts": attempts,
+        "last_notify_attempt_at": datetime.utcnow().isoformat(),
+    })
+    return sent
+
+
 async def evaluate_listing(listing: dict) -> int:
     """Match one listing against active alerts; email the owner on first match,
     and again when a re-scrape shows the price dropped below the last-seen price.
@@ -194,16 +213,16 @@ async def evaluate_listing(listing: dict) -> int:
                 and isinstance(new_price, (int, float))
                 and new_price < old_price
             ):
-                sent = await _notify_match(alert, listing, dropped_from=old_price)
                 await matches_store.update(
                     match_id,
                     {
                         "listing": _listing_snapshot(listing),
                         "previous_price": old_price,
                         "price_dropped_at": datetime.utcnow().isoformat(),
-                        "notified": existing.get("notified") or sent,
+                        "notify_kind": "price_drop",
                     },
                 )
+                await _deliver(match_id, alert, listing, dropped_from=old_price)
             continue
         record = {
             "id": match_id,
@@ -214,12 +233,50 @@ async def evaluate_listing(listing: dict) -> int:
             "listing": _listing_snapshot(listing),
             "matched_at": datetime.utcnow().isoformat(),
             "notified": False,
+            "notify_kind": "new",
+            "notify_pending": True,
+            "notify_attempts": 0,
         }
         await matches_store.upsert(record)
-        if await _notify_match(alert, listing):
-            await matches_store.update(match_id, {"notified": True})
+        await _deliver(match_id, alert, listing)
         matched += 1
     return matched
+
+
+async def retry_pending_notifications(limit: int = 500) -> dict:
+    """Re-send alert emails that failed when the match (or price drop) happened.
+
+    Gives up on a match once it has had MAX_NOTIFY_ATTEMPTS sends, is older than
+    NOTIFY_RETRY_WINDOW (a days-old "new listing" email is noise), or its alert
+    is gone/inactive. No-op without SMTP so attempts aren't burned on sends
+    that can't work.
+    """
+    from api.config.settings_config import get_settings
+
+    if not get_settings().SMTP_HOST:
+        return {"retried": 0, "sent": 0, "abandoned": 0}
+    cutoff = (datetime.utcnow() - NOTIFY_RETRY_WINDOW).isoformat()
+    retried = sent = abandoned = 0
+    for record in await matches_store.find({"notify_pending": True}, limit=limit):
+        price_drop = record.get("notify_kind") == "price_drop"
+        happened_at = record.get("price_dropped_at") if price_drop else record.get("matched_at")
+        attempts = record.get("notify_attempts") or 1
+        alert = await alerts_store.get(record.get("alert_id") or "")
+        if attempts >= MAX_NOTIFY_ATTEMPTS or (happened_at or "") < cutoff or not (
+            alert and alert.get("status") == "active"
+        ):
+            await matches_store.update(record["id"], {"notify_pending": False})
+            abandoned += 1
+            continue
+        retried += 1
+        try:
+            dropped_from = record.get("previous_price") if price_drop else None
+            sent += await _deliver(record["id"], alert, record.get("listing") or {}, dropped_from, attempts + 1)
+        except Exception:
+            logger.exception("watchr: retrying notification for match %s failed", record["id"])
+    if retried or abandoned:
+        logger.info("watchr notification retry: %d retried, %d sent, %d abandoned", retried, sent, abandoned)
+    return {"retried": retried, "sent": sent, "abandoned": abandoned}
 
 
 async def evaluate_listings(listings: List[dict]) -> int:

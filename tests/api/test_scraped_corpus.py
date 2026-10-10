@@ -1,5 +1,7 @@
 """Scraped listings persist into the f1ndr corpus and surface in search/unified/raw."""
 
+from datetime import datetime, timedelta
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -233,6 +235,117 @@ async def test_price_drop_renotifies(monkeypatch):
         await listings_store.find({"platform": "kijiji"})
     ) == 0
     assert len(sent) == 2
+
+
+@pytest.fixture
+def mailer(monkeypatch):
+    """Controllable email outbox: set `.up` False to make sends fail. SMTP_HOST is set."""
+    from api.config.settings_config import get_settings
+    from watchr.core import core as watchr_core
+
+    watchr_core.alerts_store.clear_memory()
+    watchr_core.matches_store.clear_memory()
+
+    class Mailer:
+        up = True
+        sent = []
+
+    async def fake_user(user_id):
+        return {"user_id": user_id, "email": f"{user_id}@example.com"}
+
+    async def fake_send(to, subject, body):
+        if not Mailer.up:
+            return False
+        Mailer.sent.append((to, subject))
+        return True
+
+    Mailer.sent = []
+    monkeypatch.setattr("api.auth.accounts.get_user", fake_user)
+    monkeypatch.setattr("api.auth.email.send_email", fake_send)
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    get_settings.cache_clear()
+    yield Mailer
+    get_settings.cache_clear()
+
+
+async def _ingest(title, price, url=KIJIJI_URL):
+    from watchr.core import core as watchr_core
+
+    listings = await save_scraped_listings([{"title": title, "price_value": price, "url": url}], platform="kijiji")
+    return await watchr_core.evaluate_listings(listings)
+
+
+@pytest.mark.asyncio
+async def test_failed_alert_email_is_retried(mailer):
+    from watchr.core import core as watchr_core
+
+    await watchr_core.create_alert({"name": "Civics", "query": "civic", "user_id": "u-retry"})
+    mailer.up = False
+    assert await _ingest("Honda Civic", 18500.0) == 1
+    [record] = await watchr_core.matches_store.find({"user_id": "u-retry"})
+    assert record["notified"] is False and record["notify_pending"] is True and record["notify_attempts"] == 1
+
+    mailer.up = True
+    assert await watchr_core.retry_pending_notifications() == {"retried": 1, "sent": 1, "abandoned": 0}
+    assert mailer.sent == [("u-retry@example.com", "f1ndr alert: Honda Civic")]
+    record = await watchr_core.matches_store.get(record["id"])
+    assert record["notified"] is True and record["notify_pending"] is False and record["notify_attempts"] == 2
+
+    # Nothing left to retry.
+    assert (await watchr_core.retry_pending_notifications())["retried"] == 0
+
+
+@pytest.mark.asyncio
+async def test_failed_price_drop_email_is_retried_as_price_drop(mailer):
+    from watchr.core import core as watchr_core
+
+    await watchr_core.create_alert({"name": "Civics", "query": "civic", "user_id": "u-drop"})
+    await _ingest("Honda Civic", 18500.0)
+    mailer.up = False
+    await _ingest("Honda Civic", 16000.0)
+    mailer.up = True
+    await watchr_core.retry_pending_notifications()
+    assert mailer.sent[-1] == ("u-drop@example.com", "f1ndr price drop: Honda Civic")
+
+
+@pytest.mark.asyncio
+async def test_notification_retry_gives_up(mailer, monkeypatch):
+    from watchr.core import core as watchr_core
+
+    alert = await watchr_core.create_alert({"name": "Civics", "query": "civic", "user_id": "u-giveup"})
+    mailer.up = False
+    await _ingest("Honda Civic", 18500.0)
+    [record] = await watchr_core.matches_store.find({"user_id": "u-giveup"})
+
+    for _ in range(watchr_core.MAX_NOTIFY_ATTEMPTS):
+        await watchr_core.retry_pending_notifications()
+    record = await watchr_core.matches_store.get(record["id"])
+    assert record["notify_attempts"] == watchr_core.MAX_NOTIFY_ATTEMPTS and record["notify_pending"] is False
+
+    # Stale matches and matches of deleted alerts are dropped, not emailed.
+    mailer.up = True
+    old = (datetime.utcnow() - watchr_core.NOTIFY_RETRY_WINDOW - timedelta(hours=1)).isoformat()
+    await watchr_core.matches_store.update(record["id"], {"notify_pending": True, "notify_attempts": 1, "matched_at": old})
+    assert await watchr_core.retry_pending_notifications() == {"retried": 0, "sent": 0, "abandoned": 1}
+    await watchr_core.matches_store.update(record["id"], {"notify_pending": True, "matched_at": datetime.utcnow().isoformat()})
+    await watchr_core.delete_alert(alert["alert_id"])
+    assert await watchr_core.retry_pending_notifications() == {"retried": 0, "sent": 0, "abandoned": 1}
+    assert mailer.sent == []
+
+
+@pytest.mark.asyncio
+async def test_notification_retry_skipped_without_smtp(mailer, monkeypatch):
+    from api.config.settings_config import get_settings
+    from watchr.core import core as watchr_core
+
+    await watchr_core.create_alert({"name": "Civics", "query": "civic", "user_id": "u-nosmtp"})
+    mailer.up = False
+    await _ingest("Honda Civic", 18500.0)
+    monkeypatch.delenv("SMTP_HOST")
+    get_settings.cache_clear()
+    assert await watchr_core.retry_pending_notifications() == {"retried": 0, "sent": 0, "abandoned": 0}
+    [record] = await watchr_core.matches_store.find({"user_id": "u-nosmtp"})
+    assert record["notify_attempts"] == 1 and record["notify_pending"] is True
 
 
 @pytest.mark.asyncio

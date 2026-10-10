@@ -9,6 +9,7 @@ from .core.core import (
     list_alerts,
     list_subscriptions,
     register_listing_alerts,
+    retry_pending_notifications,
     scan_alerts,
 )
 
@@ -30,6 +31,8 @@ async def run(action: str, data: dict) -> dict:
         return await delete_subscription(data["subscription_id"])
     if action == "scan":
         return {"alerts": await scan_alerts(data.get("limit", 100))}
+    if action == "retry_notifications":
+        return await retry_pending_notifications(data.get("limit", 500))
     raise ValueError(f"Invalid watchr action: {action}")
 
 

@@ -3,7 +3,8 @@
 Chromium does not fit in the 512MB container the API runs on, so scraping runs
 here instead (GitHub Actions, a worker box, locally). Opens the shared Mongo
 connection, runs the requested platform(s) through the normal pipeline — results
-upsert into `f1ndr_listings` and feed watchr alert matching — then exits.
+upsert into `f1ndr_listings` and feed watchr alert matching — then retries any
+alert emails that failed earlier, and exits.
 
 Usage:
     python scripts/run_scrape.py --platform kijiji --query civic
@@ -24,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from api.config.settings_config import get_settings
 from db.connection_db import close_db_connection, connect_to_db, get_database
 from scrapers.module import SCRAPER_CLASSES, run_scraper
+from watchr.core.core import retry_pending_notifications
 
 
 async def main() -> int:
@@ -53,6 +55,10 @@ async def main() -> int:
             failed += 0 if ok else 1
             print(f"{name}: success={ok} count={result.get('count', 0)} "
                   f"error={result.get('error')}")
+        try:
+            print(f"watchr notification retry: {await retry_pending_notifications()}")
+        except Exception:
+            logging.exception("watchr notification retry failed")
         return 1 if failed == len(platforms) else 0
     finally:
         await close_db_connection()

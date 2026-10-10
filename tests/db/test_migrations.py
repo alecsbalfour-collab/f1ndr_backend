@@ -164,6 +164,19 @@ async def test_unrunnable_sync_tasks_dropped(mongo_db):
     assert remaining == {"legacy-ok", "sync:kijiji:l1", "vin-1"}
 
 
+async def test_unsent_watchr_matches_flagged_for_retry(mongo_db):
+    await mongo_db["watchr_matches"].insert_many([
+        {"id": "unsent", "notified": False},
+        {"id": "sent", "notified": True},
+        {"id": "already-tracked", "notified": False, "notify_pending": False},
+    ])
+    await apply_migrations(mongo_db)
+    docs = {d["id"]: d async for d in mongo_db["watchr_matches"].find()}
+    assert docs["unsent"]["notify_pending"] is True and docs["unsent"]["notify_kind"] == "new"
+    assert "notify_pending" not in docs["sent"]
+    assert docs["already-tracked"]["notify_pending"] is False
+
+
 async def test_unknown_applied_versions_are_reported(mongo_db):
     await mongo_db[COLLECTION].insert_one({"_id": 999, "version": 999, "name": "from_the_future"})
     status = await migration_status(mongo_db)

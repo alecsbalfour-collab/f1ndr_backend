@@ -85,11 +85,24 @@ async def _drop_unrunnable_sync_tasks(db: AsyncIOMotorDatabase) -> None:
     logger.info("Removed %d unrunnable sync tasks", result.deleted_count)
 
 
+async def _flag_unsent_watchr_matches(db: AsyncIOMotorDatabase) -> None:
+    """Mark matches whose alert email failed before retries existed as pending.
+
+    The retry pass only looks at `notify_pending`; it drops anything older than its
+    window on the first run, so only recent misses actually get emailed.
+    """
+    await db["watchr_matches"].update_many(
+        {"notified": False, "notify_pending": None},
+        {"$set": {"notify_pending": True, "notify_kind": "new"}},
+    )
+
+
 MIGRATIONS: List[Migration] = [
     Migration(1, "baseline", _baseline),
     Migration(2, "vehicle_category_default", _vehicle_category_default),
     Migration(3, "category_verticals", _category_verticals),
     Migration(4, "drop_unrunnable_sync_tasks", _drop_unrunnable_sync_tasks),
+    Migration(5, "flag_unsent_watchr_matches", _flag_unsent_watchr_matches),
 ]
 
 
