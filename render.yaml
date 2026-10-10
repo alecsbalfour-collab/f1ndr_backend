@@ -1,9 +1,9 @@
-# Render blueprint for f1ndr-backend.
+# Render blueprint for f1ndr_backend_docker (https://f1ndr-backend-docker.onrender.com).
 # Render doesn't host MongoDB — point MONGODB_URI at Atlas (or your own) and
 # leave ENVIRONMENT=production only once that's set, since production requires Mongo.
 services:
   - type: web
-    name: f1ndr-backend
+    name: f1ndr_backend_docker
     runtime: docker
     plan: starter
     healthCheckPath: /health/live

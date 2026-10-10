@@ -4,6 +4,8 @@ DICT-aligned version controller with FlutterFlow compatibility and enterprise fe
 """
 
 import logging
+import os
+
 from fastapi import APIRouter
 from api.schemas.common import Envelope, VersionInfo, ok
 
@@ -29,6 +31,8 @@ async def version_info():
             "api_type": "REST",
             "flutterflow_compatible": True,
             "enterprise_features": True,
+            # Deployed commit, so you can tell whether a push is live (Render sets this).
+            "commit": os.getenv("RENDER_GIT_COMMIT") or os.getenv("GIT_COMMIT"),
             "timestamp": _get_timestamp(),
         },
         "Version information retrieved",

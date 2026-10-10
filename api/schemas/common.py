@@ -123,6 +123,7 @@ class VersionInfo(BaseModel):
     api_type: str
     flutterflow_compatible: bool
     enterprise_features: bool
+    commit: Optional[str] = None
     timestamp: str
 
 
