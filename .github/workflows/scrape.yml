@@ -4,7 +4,11 @@ name: Scrape Listings
 # GitHub runners have ~7GB and Playwright installs cleanly. Results persist to
 # the same MongoDB the API reads, via scripts/run_scrape.py.
 #
-# Requires a repo secret: MONGODB_URI (same value Render uses).
+# Repo secrets (same values Render uses):
+#   MONGODB_URI                                  required
+#   SMTP_HOST, SMTP_USERNAME, SMTP_PASSWORD      watchr alert emails; without
+#                                                them matches are recorded but
+#                                                nobody is emailed
 
 on:
   schedule:
@@ -42,15 +46,24 @@ jobs:
 
       - run: python -m playwright install --with-deps chromium
 
+      # Production mode so a missing SMTP config logs an error instead of the
+      # full email (recipient address included) into the Actions log. It also
+      # demands a strong JWT secret, so mint a throwaway one per run; nothing
+      # in the runner signs or verifies tokens.
+      - name: Generate runner JWT secret
+        run: echo "JWT_SECRET_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
       - name: Run scraper
         env:
+          ENVIRONMENT: production
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           MONGODB_DB_NAME: f1ndr
           MONGODB_REQUIRED: "true"
-          # Required by settings validation; never used to sign or verify
-          # anything in the runner.
-          JWT_SECRET_KEY: scrape-runner-placeholder-000000000000000000000
-        run: >-
-          python scripts/run_scrape.py
-          --platform "${{ inputs.platform || 'all' }}"
-          --query "${{ inputs.query }}"
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          EMAIL_FROM: "f1ndr <notifications@f1ndr.ca>"
+          # Inputs go through env, never straight into the script text.
+          PLATFORM: ${{ inputs.platform || 'all' }}
+          QUERY: ${{ inputs.query }}
+        run: python scripts/run_scrape.py --platform "$PLATFORM" --query "$QUERY"

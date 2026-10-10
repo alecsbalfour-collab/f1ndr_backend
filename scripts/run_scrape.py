@@ -21,6 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from api.config.settings_config import get_settings
 from db.connection_db import close_db_connection, connect_to_db, get_database
 from scrapers.module import SCRAPER_CLASSES, run_scraper
 
@@ -39,6 +40,9 @@ async def main() -> int:
     if get_database() is None:
         print("MongoDB unreachable; results would not persist. Aborting.", file=sys.stderr)
         return 2
+    if not get_settings().SMTP_HOST:
+        print("SMTP_HOST not set: watchr matches will be recorded but no alert emails sent.",
+              file=sys.stderr)
 
     try:
         platforms = list(SCRAPER_CLASSES) if args.platform == "all" else [args.platform]
