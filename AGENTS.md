@@ -25,6 +25,7 @@
 - Auth tests disable the slowapi limiter (`tests/api/test_auth.py`) and capture email by patching `api.routes.auth_routes.send_email`.
 
 ## Commands
+- Deployed API (Render, Docker): `https://f1ndr-backend-docker.onrender.com` (the old `f1ndr-backend.onrender.com` service is suspended). Pushing `main` deploys it.
 - Python: `.venv/Scripts/python.exe`
 - Run API: `.venv/Scripts/python.exe run_backend.py` (app lives in `api/main.py`; routers mounted in `api/router_api.py`)
 - Module tests: `.venv/Scripts/python.exe -m pytest -q f1ndr/tests trinn/tests sellr/tests listr/tests dealr/tests`
