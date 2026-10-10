@@ -60,6 +60,9 @@ class TrinnScheduler:
             return
         
         self.running = True
+        # Fresh queue per start: an asyncio.Queue binds to the loop that first used it,
+        # so a stop/start under a new event loop would leave every worker failing.
+        self.task_queue = asyncio.Queue()
         logger.info(f"Starting scheduler with {num_workers} workers")
         
         # Start worker tasks

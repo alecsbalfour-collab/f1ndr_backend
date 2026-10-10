@@ -4,7 +4,10 @@ from db.document_store import DocumentStore
 from dealr.core.errors_core import ForbiddenError, NotFoundError
 from dealr.data.models_data import VehicleListing, VehicleListingCreate, VehicleListingUpdate
 
-listings_store = DocumentStore("listings", key="listing_id", indexes=("dealer_id", "vin", "listing_status"))
+# Secondary indexes on "listings" come from dealr.db.client_db._ensure_indexes (vin,
+# listing_status, dealer_id+created_at). Declaring them here too creates the same keys
+# under different names, which Mongo rejects (IndexOptionsConflict) at startup.
+listings_store = DocumentStore("listings", key="listing_id")
 
 
 async def get_listing(dealer_id: str, listing_id: str) -> VehicleListing:
