@@ -9,6 +9,7 @@ name: Scrape Listings
 #   SMTP_HOST, SMTP_USERNAME, SMTP_PASSWORD      watchr alert emails; without
 #                                                them matches are recorded but
 #                                                nobody is emailed
+#   SMTP_PORT                                    optional, default 587
 
 on:
   schedule:
@@ -60,6 +61,9 @@ jobs:
           MONGODB_DB_NAME: f1ndr
           MONGODB_REQUIRED: "true"
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT || '587' }}
+          # 465 is implicit TLS (SMTP_SSL); anything else uses STARTTLS.
+          SMTP_SSL: ${{ secrets.SMTP_PORT == '465' && 'true' || 'false' }}
           SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           EMAIL_FROM: "f1ndr <notifications@f1ndr.ca>"
