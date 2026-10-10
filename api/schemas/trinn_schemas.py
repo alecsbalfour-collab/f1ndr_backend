@@ -62,6 +62,7 @@ class ScheduledTaskOut(Record):
     next_run: Optional[str] = None
     last_run: Optional[str] = None
     run_count: int = 0
+    last_error: Optional[str] = None
     enabled: bool = True
     status: Optional[str] = None
     created_at: Optional[str] = None

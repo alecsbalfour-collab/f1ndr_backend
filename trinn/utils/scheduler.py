@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from collections import defaultdict
 import uuid
 
+from trinn.db.trinn_repo import tasks_store
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +98,9 @@ class TrinnScheduler:
         interval_hours: int,
         task_id: Optional[str] = None,
         next_run: Optional[datetime] = None,
+        last_run: Optional[datetime] = None,
+        run_count: int = 0,
+        last_error: Optional[str] = None,
     ) -> str:
         """
         Schedule a task to run at regular intervals.
@@ -106,6 +110,7 @@ class TrinnScheduler:
             interval_hours: Interval between runs in hours
             task_id: Optional task ID (will be generated if not provided)
             next_run: Optional first run time (defaults to now + interval)
+            last_run, run_count, last_error: Prior run state when restoring a persisted task
 
         Returns:
             Task ID of the scheduled task
@@ -122,6 +127,9 @@ class TrinnScheduler:
                 interval_hours=interval_hours,
                 next_run=next_run,
                 created_at=datetime.utcnow(),
+                last_run=last_run,
+                run_count=run_count,
+                metadata={"last_error": last_error},
             )
 
             # Re-scheduling an existing ID replaces it; only count genuinely new tasks.
@@ -165,6 +173,7 @@ class TrinnScheduler:
             "next_run": task.next_run.isoformat(),
             "last_run": task.last_run.isoformat() if task.last_run else None,
             "run_count": task.run_count,
+            "last_error": task.metadata.get("last_error"),
             "interval_hours": task.interval_hours,
             "created_at": task.created_at.isoformat(),
         }
@@ -200,27 +209,33 @@ class TrinnScheduler:
             if task is None:
                 return False
             if task.enabled:
+                task.enabled = False  # workers skip a copy that's already queued
                 self.metrics.active_tasks -= 1
             logger.info(f"Removed task {task_id}")
             return True
     
+    async def _queue_due_tasks(self) -> int:
+        """Queue every enabled task whose next_run has passed; returns how many."""
+        now = datetime.utcnow()
+        due_tasks = []
+        async with self._lock:
+            for task in self.scheduled_tasks.values():
+                if task.enabled and task.next_run <= now:
+                    # Claim the slot now: a run longer than one tick must not
+                    # be queued again (and run concurrently on another worker).
+                    task.next_run = now + timedelta(hours=task.interval_hours)
+                    due_tasks.append(task)
+        for task in due_tasks:
+            await self.task_queue.put(task)
+            logger.debug(f"Queued task {task.task_id} for execution")
+        return len(due_tasks)
+
     async def _scheduler_loop(self) -> None:
         """Main scheduler loop to check for due tasks."""
         while self.running:
             try:
-                now = datetime.utcnow()
-                due_tasks = []
-                
-                async with self._lock:
-                    for task_id, task in self.scheduled_tasks.items():
-                        if task.enabled and task.next_run <= now:
-                            due_tasks.append(task)
-                
-                # Queue due tasks
-                for task in due_tasks:
-                    await self.task_queue.put(task)
-                    logger.debug(f"Queued task {task.task_id} for execution")
-                
+                await self._queue_due_tasks()
+
                 # Sleep for a short interval before next check
                 await asyncio.sleep(10)  # Check every 10 seconds
                 
@@ -284,6 +299,7 @@ class TrinnScheduler:
 
         try:
             task.metadata["last_result"] = await run_task(task.task_data)
+            task.metadata["last_error"] = None
         except Exception as e:
             logger.error(f"Task execution failed: {e}")
             task.metadata["last_error"] = str(e)
@@ -296,6 +312,21 @@ class TrinnScheduler:
                 # interval so a failing task doesn't retry on every scheduler tick.
                 if task.enabled:
                     task.next_run = datetime.utcnow() + timedelta(hours=task.interval_hours)
+            await self._persist_run_state(task)
+
+    @staticmethod
+    async def _persist_run_state(task: ScheduledTask) -> None:
+        """Save run state so a restart resumes the schedule instead of firing every task at boot."""
+        try:
+            await tasks_store.update(task.task_id, {
+                "next_run": task.next_run.isoformat(),
+                "last_run": task.last_run.isoformat() if task.last_run else None,
+                "run_count": task.run_count,
+                "last_error": task.metadata.get("last_error"),
+                "updated_at": datetime.utcnow().isoformat(),
+            })
+        except Exception as e:
+            logger.warning(f"Could not persist run state for task {task.task_id}: {e}")
     
     def _update_average_run_time(self, new_time: float) -> None:
         """Update average run time with exponential smoothing."""

@@ -190,6 +190,10 @@ async def schedule_task(
         raise TrinnError(f"Task scheduling failed: {str(e)}")
 
 
+# DocumentStore.find defaults to 100 docs; listing and restoring must see every task.
+_MAX_TASKS = 10_000
+
+
 def _merge_live(doc: Dict[str, Any], live: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     """Overlay live scheduler fields (next_run, run_count, last_run, enabled) onto a persisted doc."""
     return {**doc, **live} if live else doc
@@ -204,7 +208,7 @@ async def list_scheduled_tasks() -> list:
     live_by_id = {t["task_id"]: t for t in await scheduler.list_tasks()}
     tasks = []
     seen = set()
-    for doc in await tasks_store.find(sort=("created_at", -1)):
+    for doc in await tasks_store.find(sort=("created_at", -1), limit=_MAX_TASKS):
         seen.add(doc["task_id"])
         tasks.append(_merge_live(doc, live_by_id.pop(doc["task_id"], None)))
     tasks.extend(live_by_id.values())
@@ -231,15 +235,19 @@ async def restore_scheduled_tasks() -> int:
     """Re-register persisted tasks with the in-process scheduler after a restart."""
     scheduler = get_scheduler()
     restored = 0
-    for doc in await tasks_store.find({"enabled": True, "status": "scheduled"}):
+    for doc in await tasks_store.find({"enabled": True, "status": "scheduled"}, limit=_MAX_TASKS):
         task_data = doc.get("task_data") or {}
         try:
             next_run = datetime.fromisoformat(doc["next_run"]) if doc.get("next_run") else None
+            last_run = datetime.fromisoformat(doc["last_run"]) if doc.get("last_run") else None
             await scheduler.schedule_interval(
                 task_data,
                 doc.get("interval_hours") or task_data.get("interval") or get_trinn_config()["default_interval_hours"],
                 task_id=doc["task_id"],
                 next_run=next_run,
+                last_run=last_run,
+                run_count=doc.get("run_count") or 0,
+                last_error=doc.get("last_error"),
             )
             restored += 1
         except Exception as e:

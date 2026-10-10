@@ -1,5 +1,6 @@
 """Scheduled-task management endpoints: list, get, delete, scheduler state, persistence."""
 
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -168,6 +169,56 @@ async def test_listing_sync_task_is_unique_and_removed_with_listing(client, head
     assert client.delete(f"{API_V1_PREFIX}/sellr/listings/{listing_id}", headers=headers).status_code == 200
     assert await tasks_store.get(task_id) is None
     assert task_id not in get_scheduler().scheduled_tasks
+
+
+async def test_due_task_queued_once_while_running():
+    """A task still running at the next tick must not be queued (and run) again."""
+    from trinn.utils.scheduler import TrinnScheduler
+
+    scheduler = TrinnScheduler()
+    await scheduler.schedule_interval({"task": "vin", "vin": VIN}, 1, task_id="t1",
+                                      next_run=datetime.utcnow() - timedelta(minutes=1))
+    assert await scheduler._queue_due_tasks() == 1
+    assert await scheduler._queue_due_tasks() == 0
+    assert scheduler.task_queue.qsize() == 1
+
+
+async def test_removed_task_already_queued_is_skipped():
+    from trinn.utils.scheduler import TrinnScheduler
+
+    scheduler = TrinnScheduler()
+    await scheduler.schedule_interval({"task": "vin", "vin": VIN}, 1, task_id="t1",
+                                      next_run=datetime.utcnow() - timedelta(minutes=1))
+    await scheduler._queue_due_tasks()
+    queued = scheduler.task_queue.get_nowait()
+    assert await scheduler.remove_task("t1")
+    assert queued.enabled is False
+
+
+async def test_run_state_persisted_and_restored(monkeypatch):
+    """Failures and run counts survive a restart, and the restored task isn't due at boot."""
+    import trinn.core.core as core
+
+    task_id = (await schedule_task({"task": "vin", "vin": VIN, "interval": 5}))["task_id"]
+    scheduler = get_scheduler()
+    try:
+        monkeypatch.setattr(core, "run_task", AsyncMock(side_effect=core.TrinnError("decoder down")))
+        with pytest.raises(core.TrinnError):
+            await scheduler._execute_task(scheduler.scheduled_tasks[task_id])
+
+        doc = await tasks_store.get(task_id)
+        assert doc["run_count"] == 1 and "decoder down" in doc["last_error"] and doc["last_run"]
+        assert datetime.fromisoformat(doc["next_run"]) > datetime.utcnow() + timedelta(hours=4)
+
+        await scheduler.remove_task(task_id)  # simulate restart losing in-memory state
+        await restore_scheduled_tasks()
+        restored = scheduler.scheduled_tasks[task_id]
+        assert restored.run_count == 1 and restored.next_run > datetime.utcnow()
+
+        got = await core.get_scheduled_task(task_id)
+        assert got["run_count"] == 1 and "decoder down" in got["last_error"]
+    finally:
+        await delete_scheduled_task(task_id)
 
 
 async def test_deleted_task_not_restored():
