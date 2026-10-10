@@ -266,6 +266,10 @@ async def schedule_sync(data: Dict[str, Any], interval_hours: int) -> Dict[str, 
     """
     Schedule sync task with enterprise logic.
 
+    Pass the full current listing (not a partial update): it reconciles the
+    listing's sync tasks to match it. The task for its current platform is
+    (re)scheduled with this snapshot, and tasks for any other platform are cancelled.
+
     Skipped (not an error) when listing sync is disabled or the listing has no
     target platform or ID: such a task could never run, and callers like sellr
     listing creation must not fail because of it.
@@ -278,7 +282,11 @@ async def schedule_sync(data: Dict[str, Any], interval_hours: int) -> Dict[str, 
         Dictionary with scheduling confirmation (`scheduled: False` when skipped)
     """
     platform, listing_id = data.get("platform"), data.get("id")
-    if not (platform and listing_id and get_trinn_config()["enable_listing_sync"]):
+    if not listing_id:
+        return {"scheduled": False, "status": "skipped"}
+    keep = sync_task_id(platform, listing_id) if platform and get_trinn_config()["enable_listing_sync"] else None
+    await cancel_listing_sync(listing_id, keep=keep)
+    if keep is None:
         return {"scheduled": False, "status": "skipped"}
 
     sync_data = {
@@ -291,12 +299,13 @@ async def schedule_sync(data: Dict[str, Any], interval_hours: int) -> Dict[str, 
     return await schedule_task(sync_data, task_id=sync_task_id(platform, listing_id), listing_id=listing_id)
 
 
-async def cancel_listing_sync(listing_id: str) -> int:
-    """Remove every scheduled task tied to a listing (call when it's deleted). Never raises."""
+async def cancel_listing_sync(listing_id: str, keep: Optional[str] = None) -> int:
+    """Remove scheduled tasks tied to a listing (all of them on delete), except `keep`. Never raises."""
     removed = 0
     try:
         for doc in await tasks_store.find({"listing_id": listing_id}):
-            removed += await delete_scheduled_task(doc["task_id"])
+            if doc["task_id"] != keep:
+                removed += await delete_scheduled_task(doc["task_id"])
     except Exception as e:
         logger.error(f"Failed to cancel sync tasks for listing {listing_id}: {e}")
     return removed

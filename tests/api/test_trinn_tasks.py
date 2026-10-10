@@ -171,6 +171,41 @@ async def test_listing_sync_task_is_unique_and_removed_with_listing(client, head
     assert task_id not in get_scheduler().scheduled_tasks
 
 
+async def test_listing_edits_reconcile_sync_task(client, headers_for):
+    headers = headers_for("user", sub="sync-u4")
+    listing_id = _create_sellr(client, headers, platform="kijiji")
+    url = f"{API_V1_PREFIX}/sellr/listings/{listing_id}"
+    kijiji, ebay = sync_task_id("kijiji", listing_id), sync_task_id("ebay", listing_id)
+
+    # A partial edit refreshes the task's snapshot from the stored listing.
+    assert client.put(url, json={"title": "Bike v2"}, headers=headers).status_code == 200
+    assert (await tasks_store.get(kijiji))["task_data"]["listing"]["title"] == "Bike v2"
+
+    # Moving platforms replaces the task.
+    assert client.put(url, json={"platform": "ebay"}, headers=headers).status_code == 200
+    assert await tasks_store.get(kijiji) is None and kijiji not in get_scheduler().scheduled_tasks
+    assert (await tasks_store.get(ebay))["task_data"]["platform"] == "ebay"
+
+    # Clearing the platform drops it.
+    assert client.put(url, json={"platform": None}, headers=headers).status_code == 200
+    assert await tasks_store.count({"listing_id": listing_id}) == 0
+
+
+async def test_partial_dealr_update_keeps_sync_task(client, headers_for):
+    headers = headers_for("dealer", sub="sync-d1")
+    url = f"{API_V1_PREFIX}/dealr/inventory/inv-sync-1"
+    assert client.put(url, json={"name": "Truck", "platform": "kijiji"}, headers=headers).status_code == 200
+    task_id = sync_task_id("kijiji", "inv-sync-1")
+    assert await tasks_store.get(task_id)
+
+    # The update omits platform; the stored item still has it, so the task stays and refreshes.
+    assert client.put(url, json={"name": "Truck v2"}, headers=headers).status_code == 200
+    assert (await tasks_store.get(task_id))["task_data"]["listing"]["name"] == "Truck v2"
+
+    assert client.delete(url, headers=headers).status_code == 200
+    assert await tasks_store.get(task_id) is None
+
+
 async def test_due_task_queued_once_while_running():
     """A task still running at the next tick must not be queued (and run) again."""
     from trinn.utils.scheduler import TrinnScheduler

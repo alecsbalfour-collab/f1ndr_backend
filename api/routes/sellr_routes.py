@@ -12,7 +12,7 @@ from api.schemas.list_schemas import Category, OptCategory, OptSubcategory, Subc
 from api.schemas.sell_schemas import SellListing, SellListingCreate, SellListingUpdate
 from utils.response_builder import error_response
 from sellr.config.config import get_listings_config
-from sellr.core.core import create_listing
+from sellr.core.core import create_listing, schedule_listing_sync
 from sellr.utils.utils import save_listing, update_listing, delete_listing, get_listing, list_listings
 from trinn.core.core import cancel_listing_sync
 
@@ -158,7 +158,9 @@ async def update_listing_endpoint(listing_id: str, listing_data: SellListingUpda
     
     if not await _owned(listing_id, claims) or not await update_listing(listing_id, listing_data.to_data()):
         return _not_found()
-    return ok(await get_listing(listing_id), "Listing updated successfully")
+    listing = await get_listing(listing_id)
+    await schedule_listing_sync(listing, get_listings_config())  # refresh the snapshot / follow platform changes
+    return ok(listing, "Listing updated successfully")
 
 
 @router.delete("/listings/{listing_id}", response_model=Envelope[None], responses=error_responses(401, 403, 404))
