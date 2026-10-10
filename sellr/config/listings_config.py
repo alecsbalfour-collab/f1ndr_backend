@@ -2,6 +2,8 @@
 Config for listing creation.
 """
 
+import os
+
 def get_listings_config() -> dict:
     return {
         "max_title_length": 120,
@@ -29,4 +31,10 @@ def get_listings_config() -> dict:
 
         # Trinn automation
         "auto_sync_interval_hours": 24,
+
+        # Send-to-phone photo sessions
+        "photo_session_ttl_minutes": int(os.getenv("PHOTO_SESSION_TTL_MINUTES", "30")),
+        "photo_session_max_photos": int(os.getenv("PHOTO_SESSION_MAX_PHOTOS", "12")),
+        "photo_max_bytes": int(os.getenv("PHOTO_MAX_BYTES", str(8 * 1024 * 1024))),
+        "phone_upload_base_url": os.getenv("PHONE_UPLOAD_BASE_URL", ""),
     }

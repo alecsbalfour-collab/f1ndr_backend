@@ -4,15 +4,38 @@ DICT-aligned sellr API routes with FlutterFlow compatibility and enterprise feat
 """
 
 import logging
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import HTMLResponse
 from typing import Any, Dict, Optional
 from api.dependencies.auth import owns, require_scopes
 from api.schemas.common import Envelope, ModuleStatus, Page, error_responses, ok, paged
 from api.schemas.list_schemas import Category, OptCategory, OptSubcategory, Subcategory
-from api.schemas.sell_schemas import SellListing, SellListingCreate, SellListingUpdate
+from api.schemas.sell_schemas import (
+    PhotoContent,
+    PhotoOut,
+    PhotoSessionCreate,
+    PhotoSessionCreated,
+    PhotoSessionOut,
+    SellListing,
+    SellListingCreate,
+    SellListingUpdate,
+)
 from utils.response_builder import error_response
 from sellr.config.config import get_listings_config
 from sellr.core.core import create_listing, schedule_listing_sync
+from sellr.core.photos_core import (
+    PhotoError,
+    attach_photos,
+    close_session,
+    create_session,
+    fetch_photo,
+    fetch_session,
+    phone_url,
+    photo_content,
+    public_session,
+    token_session_alive,
+    upload_by_token,
+)
 from sellr.utils.utils import save_listing, update_listing, delete_listing, get_listing, list_listings
 from trinn.core.core import cancel_listing_sync
 
@@ -24,6 +47,18 @@ router = APIRouter(tags=["sellr"])
 
 def _not_found():
     return error_response(message="Listing not found", status_code=404, error_code="NOT_FOUND")
+
+
+def _photo_not_found():
+    return error_response(message="Photo resource not found", status_code=404, error_code="NOT_FOUND")
+
+
+async def _owned_session(session_id: str, claims: Dict[str, Any]) -> Optional[dict]:
+    # Other users' sessions look missing rather than forbidden, so IDs can't be probed.
+    session = await fetch_session(session_id)
+    if session is None or not owns(claims, session, "owner_id"):
+        return None
+    return session
 
 
 async def _owned(listing_id: str, claims: Dict[str, Any]) -> bool:
@@ -73,9 +108,16 @@ async def create_listing_endpoint(listing_data: SellListingCreate, claims: Dict[
     """
     logger.info(f"Creating listing: {listing_data.title}")
     
+    data = {**listing_data.to_data(), "user_id": claims["sub"]}
+    if data.get("photos") is not None:
+        try:
+            data["photos"] = await attach_photos(claims["sub"], data["photos"])
+        except PhotoError as e:
+            return error_response(message=str(e), status_code=e.status, error_code=e.code)
+
     # Use sellr core functionality
     try:
-        listing = await create_listing({**listing_data.to_data(), "user_id": claims["sub"]})
+        listing = await create_listing(data)
     except ValueError as e:
         # Business-rule messages raised by sellr.core (e.g. price below the configured minimum)
         return error_response(message=str(e), status_code=400, error_code="INVALID_LISTING")
@@ -180,3 +222,101 @@ async def delete_listing_endpoint(listing_id: str, claims: Dict[str, Any] = Depe
         return _not_found()
     await cancel_listing_sync(listing_id)
     return ok(message="Listing deleted successfully")
+
+
+# --- Send-to-phone photo sessions -------------------------------------------
+# The owner creates a short-lived session from a logged-in device; the phone
+# opens phone_url (token in the path, no login) and uploads raw image bytes.
+
+_UPLOAD_PAGE = """<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Add photos</title></head>
+<body style="font-family:sans-serif;max-width:34rem;margin:2rem auto;padding:0 1rem">
+<h1>Add photos to your listing</h1>
+<p>Take photos or choose images; they appear on your other device.</p>
+<input id="f" type="file" accept="image/*" capture="environment" multiple>
+<pre id="log"></pre>
+<script>
+const inp = document.getElementById('f'), log = document.getElementById('log');
+inp.onchange = async () => {
+  for (const file of inp.files) {
+    const r = await fetch(location.pathname, {method: 'POST', body: file,
+      headers: {'Content-Type': file.type || 'image/jpeg'}});
+    log.textContent += file.name + ': ' + (r.ok ? 'uploaded' : 'failed (' + r.status + ')') + '\\n';
+  }
+};
+</script></body></html>"""
+
+_DEAD_LINK_PAGE = """<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Link expired</title></head>
+<body style="font-family:sans-serif;max-width:34rem;margin:2rem auto;padding:0 1rem">
+<h1>This photo link is no longer active</h1>
+<p>Ask for a new photo link on the device where you are creating the listing.</p>
+</body></html>"""
+
+
+@router.post("/photo-sessions", status_code=201, response_model=Envelope[PhotoSessionCreated],
+             responses=error_responses(400, 401, 403))
+async def create_photo_session(payload: Optional[PhotoSessionCreate] = None,
+                               claims: Dict[str, Any] = Depends(_WRITER)):
+    """Create a send-to-phone photo session for a listing draft."""
+    session, token = await create_session(claims["sub"], payload.listing_id if payload else None)
+    return ok(
+        {
+            "session_id": session["id"],
+            "phone_url": phone_url(token),
+            "status": session["status"],
+            "expires_at": session["expires_at"],
+        },
+        "Photo session created",
+    )
+
+
+@router.get("/photo-sessions/{session_id}", response_model=Envelope[PhotoSessionOut],
+            responses=error_responses(401, 403, 404))
+async def get_photo_session(session_id: str, claims: Dict[str, Any] = Depends(_WRITER)):
+    """Poll a photo session (owner only): photo metadata lands here as uploads arrive."""
+    session = await _owned_session(session_id, claims)
+    if session is None:
+        return _photo_not_found()
+    return ok(await public_session(session), "Photo session retrieved")
+
+
+@router.post("/photo-sessions/{session_id}/close", response_model=Envelope[PhotoSessionOut],
+             responses=error_responses(401, 403, 404))
+async def close_photo_session(session_id: str, claims: Dict[str, Any] = Depends(_WRITER)):
+    """Close a session early; the phone link stops accepting uploads immediately."""
+    session = await _owned_session(session_id, claims)
+    if session is None:
+        return _photo_not_found()
+    return ok(await public_session(await close_session(session)), "Photo session closed")
+
+
+@router.get("/photos/{photo_id}", response_model=Envelope[PhotoContent],
+            responses=error_responses(401, 403, 404))
+async def get_photo(photo_id: str, claims: Dict[str, Any] = Depends(_WRITER)):
+    """Fetch photo bytes (owner only) as base64 inside the standard envelope."""
+    photo = await fetch_photo(photo_id)
+    if photo is None or not owns(claims, photo, "owner_id"):
+        return _photo_not_found()
+    return ok(photo_content(photo), "Photo retrieved")
+
+
+@router.get("/photo-upload/{token}", response_class=HTMLResponse, include_in_schema=False)
+async def photo_upload_page(token: str):
+    """Login-less phone upload page; the token in the path is the capability."""
+    if not await token_session_alive(token):
+        return HTMLResponse(_DEAD_LINK_PAGE, status_code=410)
+    return HTMLResponse(_UPLOAD_PAGE)
+
+
+@router.post("/photo-upload/{token}", response_model=Envelope[PhotoOut],
+             responses=error_responses(400, 404, 409, 410, 413, 415))
+async def photo_upload(token: str, request: Request):
+    """Accept raw image bytes for a live session token; no login required."""
+    try:
+        meta = await upload_by_token(token, await request.body(), request.headers.get("content-type", ""))
+    except PhotoError as e:
+        return error_response(message=str(e), status_code=e.status, error_code=e.code)
+    return ok(meta, "Photo uploaded")

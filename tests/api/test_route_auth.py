@@ -29,6 +29,8 @@ PUBLIC_ROUTES = {
     ("GET", "/f1ndr/market/value"),
     ("GET", "/sellr/listings"),
     ("GET", "/sellr/listings/{listing_id}"),
+    ("GET", "/sellr/photo-upload/{token}"),  # token in the path is the capability
+    ("POST", "/sellr/photo-upload/{token}"),
     ("GET", "/listr/platforms"),
     ("GET", "/scrapers/platforms"),
     ("GET", "/listings/unified"),

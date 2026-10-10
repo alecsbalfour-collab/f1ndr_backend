@@ -2,6 +2,8 @@
 Config for listing creation.
 """
 
+import os
+
 def get_sellr_config() -> dict:
     return {
         "feature_key": "sellr",
@@ -27,6 +29,13 @@ def get_sellr_config() -> dict:
         "enable_watchr_alerts": True,
 
         "auto_sync_interval_hours": 24,
+
+        # Send-to-phone photo sessions
+        "photo_session_ttl_minutes": int(os.getenv("PHOTO_SESSION_TTL_MINUTES", "30")),
+        "photo_session_max_photos": int(os.getenv("PHOTO_SESSION_MAX_PHOTOS", "12")),
+        "photo_max_bytes": int(os.getenv("PHOTO_MAX_BYTES", str(8 * 1024 * 1024))),
+        # Public base used to build the phone link (defaults to the API origin path).
+        "phone_upload_base_url": os.getenv("PHONE_UPLOAD_BASE_URL", ""),
     }
 
 
