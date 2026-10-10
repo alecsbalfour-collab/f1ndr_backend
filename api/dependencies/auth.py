@@ -1,6 +1,6 @@
 from typing import Any, Callable, Dict
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from api.auth.accounts import get_user
@@ -10,8 +10,13 @@ bearer = HTTPBearer(auto_error=False)
 _BEARER = {"WWW-Authenticate": "Bearer"}
 
 
-async def require_user(credentials: HTTPAuthorizationCredentials = Depends(bearer)) -> Dict[str, Any]:
-    """Reject requests without a valid, unrevoked access token; return its claims."""
+async def require_user(
+    request: Request, credentials: HTTPAuthorizationCredentials = Depends(bearer)
+) -> Dict[str, Any]:
+    """Reject requests without a valid, unrevoked access token; return its claims.
+
+    The claims are also left on `request.state.claims` for exception handlers.
+    """
     if credentials is None:
         raise HTTPException(status_code=401, detail="Not authenticated", headers=_BEARER)
     claims = verify_token(credentials.credentials)
@@ -19,6 +24,7 @@ async def require_user(credentials: HTTPAuthorizationCredentials = Depends(beare
         raise HTTPException(status_code=401, detail="Invalid token type", headers=_BEARER)
     if await is_access_token_revoked(claims.get("jti")):
         raise HTTPException(status_code=401, detail="Token has been revoked", headers=_BEARER)
+    request.state.claims = claims
     return claims
 
 

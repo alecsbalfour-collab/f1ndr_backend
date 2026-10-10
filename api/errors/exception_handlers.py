@@ -108,9 +108,11 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 
 async def trinn_exception_handler(request: Request, exc: TrinnError):
-    # exc.message embeds the underlying error (upstream details, internals). Safe to
-    # surface in details here because every route that can raise TrinnError is behind
-    # require_scopes("tasks:admin") — it never reaches anonymous callers.
+    # exc.message embeds the underlying error (upstream details, internals). Only task
+    # admins get it: sellr/dealr routes reach trinn too, and their callers must not.
+    claims = getattr(request.state, "claims", None) or {}
+    details = {"reason": exc.message} if "tasks:admin" in (claims.get("scopes") or []) else None
+    logger.warning("Trinn error on %s: %s", request.url.path, exc.message)
     if isinstance(exc, TrinnValidationError):
         status_code, message = 400, "Invalid task parameters"
     elif isinstance(exc, ExternalServiceError):
@@ -120,7 +122,7 @@ async def trinn_exception_handler(request: Request, exc: TrinnError):
     return error_response(
         message=message,
         status_code=status_code,
-        details={"reason": exc.message},
+        details=details,
         error_code=exc.error_code,
         request_id=_request_id(request),
     )

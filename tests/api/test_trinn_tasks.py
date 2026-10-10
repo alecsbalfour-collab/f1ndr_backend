@@ -88,6 +88,20 @@ def test_run_scrape_failure_returns_502(client, headers_for, monkeypatch):
     assert "blocked" in body["details"]["reason"]
 
 
+async def test_trinn_failure_reason_hidden_from_non_admins(client, headers_for, monkeypatch):
+    """sellr reaches trinn via schedule_sync; a regular user must not see the internal reason."""
+    import trinn.core.core as core
+
+    monkeypatch.setattr(core, "schedule_task", AsyncMock(side_effect=core.TrinnError("mongo exploded at 10.0.0.5")))
+    resp = client.post(
+        f"{API_V1_PREFIX}/sellr/listings",
+        json={"title": "Bike", "price": 100, "category": "goods", "platform": "kijiji"},
+        headers=headers_for("user", sub="leak-u1"),
+    )
+    assert resp.status_code == 502
+    assert "10.0.0.5" not in resp.text
+
+
 def test_scheduler_status_endpoint(client, headers_for):
     resp = client.get(f"{API_V1_PREFIX}/trinn/scheduler", headers=headers_for("admin"))
     assert resp.status_code == 200
