@@ -143,6 +143,27 @@ async def test_category_split_backfills_vehicles(mongo_db):
         assert docs["goods"]["category"] == "goods" and "subcategory" not in docs["goods"]
 
 
+async def test_unrunnable_sync_tasks_dropped(mongo_db):
+    listing = {"title": "Bike", "price": 100}
+    await mongo_db["trinn_tasks"].insert_many([
+        # Legacy sellr shape: no platform, listing never had an id.
+        {"task_id": "legacy-sellr", "task": "sync", "task_data": {"task": "sync", "platform": None, "listing": listing}},
+        # Legacy dealr update: id present, platform missing.
+        {"task_id": "legacy-dealr", "task": "sync", "task_data": {"task": "sync", "listing": {**listing, "id": "inv1"}}},
+        # Legacy but runnable: platform + id. Kept.
+        {"task_id": "legacy-ok", "task": "sync",
+         "task_data": {"task": "sync", "platform": "kijiji", "listing": {**listing, "id": "inv2"}}},
+        # Current shape. Kept.
+        {"task_id": "sync:kijiji:l1", "task": "sync", "listing_id": "l1",
+         "task_data": {"task": "sync", "platform": "kijiji", "listing": {**listing, "id": "l1"}}},
+        # Other task types. Kept.
+        {"task_id": "vin-1", "task": "vin", "task_data": {"task": "vin", "vin": "1HGCM82633A004352"}},
+    ])
+    await apply_migrations(mongo_db)
+    remaining = {d["task_id"] async for d in mongo_db["trinn_tasks"].find()}
+    assert remaining == {"legacy-ok", "sync:kijiji:l1", "vin-1"}
+
+
 async def test_unknown_applied_versions_are_reported(mongo_db):
     await mongo_db[COLLECTION].insert_one({"_id": 999, "version": 999, "name": "from_the_future"})
     status = await migration_status(mongo_db)

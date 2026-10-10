@@ -70,10 +70,26 @@ async def _category_verticals(db: AsyncIOMotorDatabase) -> None:
         )
 
 
+async def _drop_unrunnable_sync_tasks(db: AsyncIOMotorDatabase) -> None:
+    """Delete sync tasks scheduled before schedule_sync required a platform and listing id.
+
+    Every sellr listing create (and dealr inventory update) used to persist one with
+    no platform or no listing id: it can never run (or never be cancelled) and failed
+    every interval. Tasks scheduled since carry `listing_id`, so they're untouched.
+    """
+    result = await db["trinn_tasks"].delete_many({
+        "task": "sync",
+        "listing_id": None,
+        "$or": [{"task_data.platform": None}, {"task_data.listing.id": None}],
+    })
+    logger.info("Removed %d unrunnable sync tasks", result.deleted_count)
+
+
 MIGRATIONS: List[Migration] = [
     Migration(1, "baseline", _baseline),
     Migration(2, "vehicle_category_default", _vehicle_category_default),
     Migration(3, "category_verticals", _category_verticals),
+    Migration(4, "drop_unrunnable_sync_tasks", _drop_unrunnable_sync_tasks),
 ]
 
 
