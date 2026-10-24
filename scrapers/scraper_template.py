@@ -8,7 +8,7 @@ import traceback
 import requests
 from bs4 import BeautifulSoup
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 logger = logging.getLogger(__name__)
@@ -67,7 +67,7 @@ def parse_html(html: str, platform: str = "template") -> List[Dict[str, Any]]:
                 "location": item.select_one(".location").get_text(strip=True) if item.select_one(".location") else None,
                 "posted_at": None,  # fill in if available
                 "platform": platform,
-                "scraped_at": datetime.utcnow().isoformat(),
+                "scraped_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                 "raw_data": str(item),
             }
             raw_listings.append(listing)
@@ -107,7 +107,7 @@ def run(query: str = None, platform: str = "template") -> Dict[str, Any]:
             "metadata": {
                 "platform": platform,
                 "query": query,
-                "scraped_at": datetime.utcnow().isoformat(),
+                "scraped_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                 "listings_count": len(listings),
                 "source_url": url,
             }
@@ -122,7 +122,7 @@ def run(query: str = None, platform: str = "template") -> Dict[str, Any]:
             "metadata": {
                 "platform": platform,
                 "query": query,
-                "scraped_at": datetime.utcnow().isoformat(),
+                "scraped_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                 "error_type": type(e).__name__,
             }
         }

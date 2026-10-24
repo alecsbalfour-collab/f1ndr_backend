@@ -5,7 +5,7 @@ Watchr core functions used by other modules and the API routes.
 
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from db.document_store import DocumentStore
@@ -26,7 +26,7 @@ NOTIFY_RETRY_WINDOW = timedelta(days=3)
 
 
 def _timestamps() -> dict:
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
     return {"created_at": now, "updated_at": now}
 
 
@@ -35,7 +35,7 @@ async def register_listing_alerts(listing: dict) -> dict:
         "event_type": "listing.created",
         "subscriber": listing.get("owner_id") or listing.get("user_id"),
         "listing_id": listing.get("id"),
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
     })
     subscription = {
         **build_subscription_payload(event),
@@ -185,22 +185,25 @@ async def _deliver(
         "notified": sent,
         "notify_pending": not sent and attempts < MAX_NOTIFY_ATTEMPTS,
         "notify_attempts": attempts,
-        "last_notify_attempt_at": datetime.utcnow().isoformat(),
+        "last_notify_attempt_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
     })
     return sent
 
 
-async def evaluate_listing(listing: dict) -> int:
+async def evaluate_listing(listing: dict, alerts: Optional[List[dict]] = None) -> int:
     """Match one listing against active alerts; email the owner on first match,
     and again when a re-scrape shows the price dropped below the last-seen price.
 
     A `watchr_matches` record per (alert, listing) dedupes re-scrapes and feeds
     `GET /watchr/matches`. Returns the number of new matches (price drops don't count).
+    `alerts` may be supplied by a batch caller so the active set is fetched once.
     """
     if not listing.get("id"):
         return 0
+    if alerts is None:
+        alerts = await alerts_store.find({"status": "active"}, limit=10_000)
     matched = 0
-    for alert in await alerts_store.find({"status": "active"}, limit=10_000):
+    for alert in alerts:
         if not _alert_matches(alert, listing):
             continue
         match_id = f"{alert['alert_id']}:{listing['id']}"
@@ -218,7 +221,7 @@ async def evaluate_listing(listing: dict) -> int:
                     {
                         "listing": _listing_snapshot(listing),
                         "previous_price": old_price,
-                        "price_dropped_at": datetime.utcnow().isoformat(),
+                        "price_dropped_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                         "notify_kind": "price_drop",
                     },
                 )
@@ -231,7 +234,7 @@ async def evaluate_listing(listing: dict) -> int:
             "user_id": alert.get("user_id"),
             "listing_id": listing["id"],
             "listing": _listing_snapshot(listing),
-            "matched_at": datetime.utcnow().isoformat(),
+            "matched_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
             "notified": False,
             "notify_kind": "new",
             "notify_pending": True,
@@ -255,7 +258,7 @@ async def retry_pending_notifications(limit: int = 500) -> dict:
 
     if not get_settings().SMTP_HOST:
         return {"retried": 0, "sent": 0, "abandoned": 0}
-    cutoff = (datetime.utcnow() - NOTIFY_RETRY_WINDOW).isoformat()
+    cutoff = (datetime.now(timezone.utc).replace(tzinfo=None) - NOTIFY_RETRY_WINDOW).isoformat()
     retried = sent = abandoned = 0
     for record in await matches_store.find({"notify_pending": True}, limit=limit):
         price_drop = record.get("notify_kind") == "price_drop"
@@ -281,12 +284,18 @@ async def retry_pending_notifications(limit: int = 500) -> dict:
 
 async def evaluate_listings(listings: List[dict]) -> int:
     """Evaluate a batch; one bad listing must not stop the rest of ingest."""
+    if not listings:
+        return 0
+    alerts = await alerts_store.find({"status": "active"}, limit=10_000)
     matched = 0
     for listing in listings:
         try:
-            matched += await evaluate_listing(listing)
+            matched += await evaluate_listing(listing, alerts=alerts)
         except Exception:
-            logger.exception("watchr: failed to evaluate listing %s", listing.get("id"))
+            logger.exception(
+                "watchr: failed to evaluate listing %s",
+                listing.get("id") if isinstance(listing, dict) else listing,
+            )
     return matched
 
 

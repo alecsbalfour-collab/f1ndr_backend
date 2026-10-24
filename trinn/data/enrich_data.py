@@ -5,7 +5,7 @@ DICT-aligned TRINN enrich data builders with enterprise features.
 
 import logging
 from typing import Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass
 
 
@@ -27,7 +27,7 @@ class EnrichPayload:
         if self.metadata is None:
             self.metadata = {}
         if self.enriched_at is None:
-            self.enriched_at = datetime.utcnow().isoformat()
+            self.enriched_at = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
 
 
 def build_enrich_payload(raw: Dict[str, Any]) -> Dict[str, Any]:
@@ -74,7 +74,7 @@ def build_enrich_metadata(raw: Dict[str, Any]) -> Dict[str, Any]:
         Dictionary with enrichment metadata
     """
     metadata = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         "processing_stage": "enrich",
         "data_size_bytes": len(str(raw)),
         "field_count": len(raw.keys()),

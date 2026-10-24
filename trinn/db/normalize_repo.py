@@ -5,7 +5,7 @@ DICT-aligned TRINN normalize repository with enterprise features.
 
 import logging
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from trinn.core.interface_core import RepoInterface
 from trinn.core.exceptions_core import RepositoryError
 
@@ -35,8 +35,8 @@ class NormalizeRepo(RepoInterface):
             # Add enterprise metadata
             doc_with_metadata = {
                 **doc,
-                "created_at": datetime.utcnow().isoformat(),
-                "updated_at": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
+                "updated_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                 "repository": "normalize",
             }
             
@@ -84,7 +84,7 @@ class NormalizeRepo(RepoInterface):
                 **update,
                 "$set": {
                     **update.get("$set", {}),
-                    "updated_at": datetime.utcnow().isoformat(),
+                    "updated_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                 }
             }
             

@@ -5,7 +5,7 @@ DICT-aligned base processor with enterprise features and FlutterFlow compatibili
 
 import logging
 from typing import Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ class BaseProcessor:
                     "status": "disabled",
                     "success": False,
                     "message": "Processor is disabled",
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                 }
 
             errors = self.validator.validate(payload)
@@ -54,7 +54,7 @@ class BaseProcessor:
                 "status": "ok",
                 "success": True,
                 "payload": formatted,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                 "processor": "base",
             }
             
@@ -64,6 +64,6 @@ class BaseProcessor:
                 "status": "error",
                 "success": False,
                 "error": str(e),
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                 "processor": "base",
             }

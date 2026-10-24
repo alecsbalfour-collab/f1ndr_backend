@@ -5,7 +5,7 @@ DICT-aligned TRINN normalize data builders with enterprise features.
 
 import logging
 from typing import Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass
 
 
@@ -26,7 +26,7 @@ class NormalizePayload:
     
     def __post_init__(self):
         if self.normalized_at is None:
-            self.normalized_at = datetime.utcnow().isoformat()
+            self.normalized_at = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
         if self.field_mapping is None:
             self.field_mapping = {}
 
@@ -84,7 +84,7 @@ def build_normalize_metadata(enriched: Dict[str, Any]) -> Dict[str, Any]:
     base = enriched.get("raw", {})
     
     metadata = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         "processing_stage": "normalize",
         "original_field_count": len(base.keys()),
         "normalized_field_count": 0,

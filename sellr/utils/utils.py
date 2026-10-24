@@ -6,7 +6,7 @@ DICT-aligned sellr utilities with enterprise features and real database operatio
 import logging
 import uuid
 from typing import Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from db.document_store import DocumentStore
 
@@ -18,7 +18,7 @@ listings_store = DocumentStore("sellr_listings", key="id", indexes=("user_id", "
 
 async def save_listing(listing: Dict[str, Any]) -> str:
     """Save listing with enterprise metadata. Returns the listing ID."""
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
     listing_id = listing.get("id") or str(uuid.uuid4())
     listing["category"] = listing.get("category") or "other"
     listing["status"] = listing.get("status") or "active"  # keep the response in step with the stored doc
@@ -44,7 +44,7 @@ async def update_listing(listing_id: str, listing_data: Dict[str, Any]) -> bool:
         **listing_data,
         "id": listing_id,
         "created_at": existing.get("created_at"),
-        "updated_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
     }
     merged["category"] = merged.get("category") or "other"
     await listings_store.upsert(merged)

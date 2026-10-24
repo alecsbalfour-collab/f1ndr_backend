@@ -3,7 +3,7 @@ Repository for dealer inventory.
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from db.document_store import DocumentStore
@@ -12,7 +12,7 @@ inventory_store = DocumentStore("dealr_inventory", key="id", indexes=("status", 
 
 
 async def save_inventory(inv: dict) -> str:
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
     inv.setdefault("id", str(uuid.uuid4()))
     inv.setdefault("status", "active")
     inv["category"] = inv.get("category") or "other"
@@ -24,7 +24,7 @@ async def save_inventory(inv: dict) -> str:
 
 async def update_inventory_db(inv: dict) -> bool:
     existing = await inventory_store.get(inv["id"]) or {}
-    merged = {**existing, **inv, "updated_at": datetime.utcnow().isoformat()}
+    merged = {**existing, **inv, "updated_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat()}
     merged["category"] = merged.get("category") or "other"
     merged.setdefault("created_at", merged["updated_at"])
     return await inventory_store.upsert(merged)

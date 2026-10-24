@@ -1,8 +1,8 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 class TimeUtils:
     def now(self):
-        return datetime.utcnow().isoformat()
+        return datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
 
 
 time_utils = TimeUtils()

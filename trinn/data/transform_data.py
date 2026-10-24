@@ -5,7 +5,7 @@ DICT-aligned TRINN transform data builders with enterprise features.
 
 import logging
 from typing import Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass
 
 
@@ -26,7 +26,7 @@ class TransformPayload:
     
     def __post_init__(self):
         if self.transformed_at is None:
-            self.transformed_at = datetime.utcnow().isoformat()
+            self.transformed_at = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
         if self.transformation_rules is None:
             self.transformation_rules = {}
 
@@ -87,7 +87,7 @@ def build_transform_metadata(normalized: Dict[str, Any]) -> Dict[str, Any]:
     source = normalized.get("source")
     
     metadata = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         "processing_stage": "transform",
         "original_source": source,
         "canonical_source": map_source_to_canonical(source),

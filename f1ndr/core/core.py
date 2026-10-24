@@ -21,7 +21,6 @@ async def run_search(params: dict) -> dict:
     price_min, price_max, text, region, location.
     """
     config = get_f1ndr_config()
-    listings = await query_listings()
 
     category = params.get("category")
     subcategory = params.get("subcategory")
@@ -34,6 +33,21 @@ async def run_search(params: dict) -> dict:
     region = params.get("region")
     location = (params.get("location") or "").lower().strip()
     text = (params.get("text") or "").lower().strip()
+
+    # Push exact-equality filters into the store query. Legacy docs missing
+    # category/subcategory read as "other" in matches(), so those two only go
+    # down when the filter itself isn't "other".
+    db_query = {
+        k: v
+        for k, v in {
+            "make": make,
+            "region": region,
+            "category": category if category != "other" else None,
+            "subcategory": subcategory if subcategory != "other" else None,
+        }.items()
+        if v
+    }
+    listings = await query_listings(db_query)
 
     def matches(l: dict) -> bool:
         # Listings without a category/subcategory land in "other" rather than guessing.

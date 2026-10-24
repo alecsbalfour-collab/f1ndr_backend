@@ -184,7 +184,7 @@ async def get_listing_endpoint(listing_id: str):
     return ok(listing, "Listing retrieved") if listing else _not_found()
 
 
-@router.put("/listings/{listing_id}", response_model=Envelope[SellListing], responses=error_responses(401, 403, 404))
+@router.put("/listings/{listing_id}", response_model=Envelope[SellListing], responses=error_responses(400, 401, 403, 404))
 async def update_listing_endpoint(listing_id: str, listing_data: SellListingUpdate, claims: Dict[str, Any] = Depends(_WRITER)):
     """
     Update listing with enterprise validation and FlutterFlow compatibility.
@@ -197,8 +197,16 @@ async def update_listing_endpoint(listing_id: str, listing_data: SellListingUpda
         FlutterFlow-compatible response with updated listing
     """
     logger.info(f"Updating listing: {listing_id}")
-    
-    if not await _owned(listing_id, claims) or not await update_listing(listing_id, listing_data.to_data()):
+
+    if not await _owned(listing_id, claims):
+        return _not_found()
+    data = listing_data.to_data()
+    if data.get("photos") is not None:
+        try:
+            data["photos"] = await attach_photos(claims["sub"], data["photos"])
+        except PhotoError as e:
+            return error_response(message=str(e), status_code=e.status, error_code=e.code)
+    if not await update_listing(listing_id, data):
         return _not_found()
     listing = await get_listing(listing_id)
     await schedule_listing_sync(listing, get_listings_config())  # refresh the snapshot / follow platform changes

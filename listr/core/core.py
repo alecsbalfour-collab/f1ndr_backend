@@ -2,7 +2,7 @@
 Core marketplace posting logic for listr.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from listr.config.config import get_listr_config
 from listr.db.listing_repo import save_listing, update_listing_db, remove_listing_db
@@ -13,7 +13,7 @@ def _prepare(platform: str, listing: dict) -> tuple:
     config = get_listr_config()
     if platform not in config["supported_platforms"]:
         raise ValueError(f"Unsupported listr platform: {platform}")
-    prepared = {**listing, "platform": platform, "updated_at": datetime.utcnow().isoformat()}
+    prepared = {**listing, "platform": platform, "updated_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat()}
     prepared["category"] = prepared.get("category") or "other"
     if prepared.get("title"):
         prepared["title"] = truncate_title(prepared["title"], config["max_title_length"])

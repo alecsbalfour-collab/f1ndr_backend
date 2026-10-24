@@ -6,7 +6,7 @@ DICT-aligned TRINN core orchestration with enterprise features.
 import logging
 import asyncio
 from typing import Dict, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from trinn.config.config import get_trinn_config
 from trinn.db.trinn_repo import tasks_store
@@ -81,7 +81,7 @@ async def _execute_scrape_task(data: Dict[str, Any], config) -> Dict[str, Any]:
         "platform": platform,
         "status": "completed",
         "result": result,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
     }
 
 
@@ -100,7 +100,7 @@ async def _execute_vin_task(data: Dict[str, Any], config) -> Dict[str, Any]:
             "vin": vin,
             "status": "completed",
             "result": decoded,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         }
         
     except Exception as e:
@@ -123,7 +123,7 @@ async def _execute_sync_task(data: Dict[str, Any], config) -> Dict[str, Any]:
             "platform": platform,
             "status": "completed",
             "result": result,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         }
         
     except Exception as e:
@@ -154,7 +154,7 @@ async def schedule_task(
 
     try:
         # Calculate next run time
-        next_run = datetime.utcnow() + timedelta(hours=interval)
+        next_run = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=interval)
 
         # Schedule the task
         task_id = await get_scheduler().schedule_interval(data, interval, task_id=task_id, next_run=next_run)
@@ -170,8 +170,8 @@ async def schedule_task(
                 "next_run": next_run.isoformat(),
                 "enabled": True,
                 "status": "scheduled",
-                "created_at": datetime.utcnow().isoformat(),
-                "updated_at": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
+                "updated_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
             })
         except Exception as e:
             logger.warning(f"Task {task_id} scheduled in memory only; persistence failed: {e}")
@@ -182,7 +182,7 @@ async def schedule_task(
             "interval_hours": interval,
             "next_run": next_run.isoformat(),
             "status": "scheduled",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         }
         
     except Exception as e:

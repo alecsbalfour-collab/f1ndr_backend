@@ -6,7 +6,7 @@ DICT-aligned TRINN scheduler with enterprise features.
 import logging
 import asyncio
 from typing import Dict, Any, Optional, Callable
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass, field
 from collections import defaultdict
 import uuid
@@ -122,14 +122,14 @@ class TrinnScheduler:
             task_id = str(uuid.uuid4())
 
         async with self._lock:
-            next_run = next_run or datetime.utcnow() + timedelta(hours=interval_hours)
+            next_run = next_run or datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=interval_hours)
 
             scheduled_task = ScheduledTask(
                 task_id=task_id,
                 task_data=task_data,
                 interval_hours=interval_hours,
                 next_run=next_run,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc).replace(tzinfo=None),
                 last_run=last_run,
                 run_count=run_count,
                 metadata={"last_error": last_error},
@@ -219,7 +219,7 @@ class TrinnScheduler:
     
     async def _queue_due_tasks(self) -> int:
         """Queue every enabled task whose next_run has passed; returns how many."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         due_tasks = []
         async with self._lock:
             for task in self.scheduled_tasks.values():
@@ -268,12 +268,12 @@ class TrinnScheduler:
                 logger.info(f"Worker {worker_name} executing task {task.task_id}")
                 
                 # Execute task
-                start_time = datetime.utcnow()
+                start_time = datetime.now(timezone.utc).replace(tzinfo=None)
                 try:
                     await self._execute_task(task)
                     
                     # Update metrics
-                    run_time = (datetime.utcnow() - start_time).total_seconds() * 1000
+                    run_time = (datetime.now(timezone.utc).replace(tzinfo=None) - start_time).total_seconds() * 1000
                     self.metrics.completed_runs += 1
                     self._update_average_run_time(run_time)
                     
@@ -309,12 +309,12 @@ class TrinnScheduler:
             raise
         finally:
             async with self._lock:
-                task.last_run = datetime.utcnow()
+                task.last_run = datetime.now(timezone.utc).replace(tzinfo=None)
                 task.run_count += 1
                 # A failed run still consumed its slot: push next_run out by the
                 # interval so a failing task doesn't retry on every scheduler tick.
                 if task.enabled:
-                    task.next_run = datetime.utcnow() + timedelta(hours=task.interval_hours)
+                    task.next_run = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=task.interval_hours)
             await self._persist_run_state(task)
 
     @staticmethod
@@ -326,7 +326,7 @@ class TrinnScheduler:
                 "last_run": task.last_run.isoformat() if task.last_run else None,
                 "run_count": task.run_count,
                 "last_error": task.metadata.get("last_error"),
-                "updated_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
             })
         except Exception as e:
             logger.warning(f"Could not persist run state for task {task.task_id}: {e}")

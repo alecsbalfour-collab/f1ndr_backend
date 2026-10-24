@@ -5,7 +5,7 @@ DICT-aligned base database module with enterprise features and real MongoDB oper
 
 import logging
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from motor.motor_asyncio import AsyncIOMotorClient
 from contextlib import asynccontextmanager
 
@@ -82,8 +82,8 @@ class BaseDatabase:
             # Add enterprise metadata
             document_with_metadata = {
                 **document,
-                "created_at": datetime.utcnow().isoformat(),
-                "updated_at": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
+                "updated_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
             }
             
             result = await collection.insert_one(document_with_metadata)
@@ -113,8 +113,8 @@ class BaseDatabase:
             for doc in documents:
                 documents_with_metadata.append({
                     **doc,
-                    "created_at": datetime.utcnow().isoformat(),
-                    "updated_at": datetime.utcnow().isoformat(),
+                    "created_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
+                    "updated_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                 })
             
             result = await collection.insert_many(documents_with_metadata)
@@ -210,7 +210,7 @@ class BaseDatabase:
                 **update,
                 "$set": {
                     **update.get("$set", {}),
-                    "updated_at": datetime.utcnow().isoformat(),
+                    "updated_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                 }
             }
             
@@ -248,7 +248,7 @@ class BaseDatabase:
                 **update,
                 "$set": {
                     **update.get("$set", {}),
-                    "updated_at": datetime.utcnow().isoformat(),
+                    "updated_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                 }
             }
             

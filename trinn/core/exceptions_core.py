@@ -5,7 +5,7 @@ DICT-aligned TRINN exceptions with enterprise features.
 
 import logging
 from typing import Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ class TrinnError(Exception):
         self.message = message
         self.error_code = error_code or "TRINN_ERROR"
         self.context = context or {}
-        self.timestamp = datetime.utcnow().isoformat()
+        self.timestamp = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
         
         # Log the error with enterprise metadata
         logger.error(
@@ -188,5 +188,5 @@ def handle_trinn_error(error: Exception) -> Dict[str, Any]:
             "error_code": "UNKNOWN_ERROR",
             "message": str(error),
             "error_type": type(error).__name__,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         }

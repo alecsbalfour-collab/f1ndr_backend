@@ -6,7 +6,7 @@ DICT-aligned TRINN validation utilities with enterprise features.
 import logging
 from typing import Dict, Any, List, Optional, Union
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ class ValidationResult:
     
     def __post_init__(self):
         if self.timestamp is None:
-            self.timestamp = datetime.utcnow().isoformat()
+            self.timestamp = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
 
 
 def require_fields(data: Dict[str, Any], fields: List[str]) -> bool:
@@ -78,7 +78,7 @@ def validate_field_types(data: Dict[str, Any], field_types: Dict[str, type]) -> 
         errors=errors,
         warnings=warnings,
         validated_fields=validated_fields,
-        timestamp=datetime.utcnow().isoformat(),
+        timestamp=datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
     )
     
     logger.info(f"Field type validation: {len(validated_fields)} valid, {len(errors)} errors")
@@ -120,7 +120,7 @@ def validate_field_ranges(data: Dict[str, Any], field_ranges: Dict[str, tuple]) 
         errors=errors,
         warnings=warnings,
         validated_fields=validated_fields,
-        timestamp=datetime.utcnow().isoformat(),
+        timestamp=datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
     )
     
     logger.info(f"Field range validation: {len(validated_fields)} valid, {len(errors)} errors")
@@ -162,7 +162,7 @@ def validate_string_lengths(data: Dict[str, Any], field_lengths: Dict[str, tuple
         errors=errors,
         warnings=warnings,
         validated_fields=validated_fields,
-        timestamp=datetime.utcnow().isoformat(),
+        timestamp=datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
     )
     
     logger.info(f"String length validation: {len(validated_fields)} valid, {len(errors)} errors")
@@ -208,7 +208,7 @@ def validate_data_integrity(data: Dict[str, Any], checksum: Optional[str] = None
         errors=errors,
         warnings=warnings,
         validated_fields=validated_fields,
-        timestamp=datetime.utcnow().isoformat(),
+        timestamp=datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
     )
     
     logger.info(f"Data integrity validation: {len(validated_fields)} valid, {len(errors)} errors")
@@ -256,7 +256,7 @@ async def async_validate_data(data: Dict[str, Any], validators: List[callable]) 
         errors=all_errors,
         warnings=all_warnings,
         validated_fields=all_validated_fields,
-        timestamp=datetime.utcnow().isoformat(),
+        timestamp=datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
     )
     
     logger.info(f"Async validation complete: {len(all_validated_fields)} fields validated")

@@ -5,7 +5,7 @@ DICT-aligned TRINN enrich utilities with enterprise features.
 
 import logging
 from typing import Dict, Any, Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ def enrich_with_metadata(data: Dict[str, Any], metadata: Optional[Dict[str, Any]
     
     # Add enterprise metadata
     enriched["enrichment_metadata"] = {
-        "enriched_at": datetime.utcnow().isoformat(),
+        "enriched_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         "enrichment_version": "1.0.0",
         "original_field_count": len(data.keys()),
     }
@@ -55,7 +55,7 @@ def enrich_with_source_tracking(data: Dict[str, Any], source: Optional[str] = No
     # Add source tracking
     enriched["source_tracking"] = {
         "source": source or enriched.get("source", "unknown"),
-        "source_received_at": datetime.utcnow().isoformat(),
+        "source_received_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         "source_confidence": 1.0,  # Default confidence
     }
     
@@ -78,7 +78,7 @@ def enrich_with_data_quality_metrics(data: Dict[str, Any]) -> Dict[str, Any]:
         "field_count": len(data.keys()),
         "empty_fields": _count_empty_fields(data),
         "data_size_bytes": len(str(data)),
-        "analyzed_at": datetime.utcnow().isoformat(),
+        "analyzed_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
     }
     
     enriched = data.copy()
@@ -117,8 +117,8 @@ def enrich_with_timestamps(data: Dict[str, Any]) -> Dict[str, Any]:
     enriched = data.copy()
     
     enriched["timestamp_tracking"] = {
-        "created_at": datetime.utcnow().isoformat(),
-        "updated_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
+        "updated_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         "processing_stage": "enrich",
     }
     

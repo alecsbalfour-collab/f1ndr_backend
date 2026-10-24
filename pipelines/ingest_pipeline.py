@@ -5,7 +5,7 @@ DICT-aligned ingest pipeline with enterprise features and FlutterFlow compatibil
 
 import logging
 from typing import Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .core.pipeline_core import PipelineCore
 from .utils.pipeline_logger_utils import pipeline_logger_utils
@@ -47,7 +47,7 @@ class ingestPipeline:
             # Add enterprise metadata
             result["metadata"] = {
                 "pipeline_type": "ingest",
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                 "feature_key": "pipelines_ingest",
                 "success": True,
             }
@@ -62,7 +62,7 @@ class ingestPipeline:
                 "error": str(e),
                 "metadata": {
                     "pipeline_type": "ingest",
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                     "feature_key": "pipelines_ingest",
                     "error_type": type(e).__name__,
                 }

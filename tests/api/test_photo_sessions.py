@@ -146,3 +146,44 @@ def test_listing_attach_and_cross_owner_guard(client, headers_for):
         json={"title": "Y", "price": 1, "category": "goods", "photos": ["nope"]},
         headers=owner,
     ).status_code == 400
+
+
+async def test_update_listing_attaches_and_validates_photos(client, headers_for):
+    """PUT /sellr/listings/{id} must attach + ownership-check photos like POST does."""
+    from sellr.db.photo_repo import photos_store
+
+    owner = headers_for("user", sub="photo-put")
+    other = headers_for("user", sub="photo-put2")
+    data = _session(client, owner)
+    photo = _upload(client, _token(data)).json()["data"]
+
+    created = client.post(
+        f"{API}/sellr/listings",
+        json={"title": "Civic", "price": 7000, "category": "vehicles"},
+        headers=owner,
+    ).json()["data"]
+
+    resp = client.put(
+        f"{API}/sellr/listings/{created['id']}",
+        json={"photos": [photo["id"]]},
+        headers=owner,
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["photos"] == [photo["id"]]
+    # Attached photos survive session expiry; before the fix they stayed unattached.
+    assert (await photos_store.get(photo["id"]))["attached"] is True
+
+    # Another user's listing is 404 before any photo ids are probed.
+    assert client.put(
+        f"{API}/sellr/listings/{created['id']}", json={"photos": [photo["id"]]}, headers=other
+    ).status_code == 404
+
+    # A photo owned by someone else cannot be attached to your own listing.
+    other_photo = _upload(client, _token(_session(client, other))).json()["data"]
+    resp = client.put(
+        f"{API}/sellr/listings/{created['id']}",
+        json={"photos": [other_photo["id"]]},
+        headers=owner,
+    )
+    assert resp.status_code == 400
+    assert resp.json()["error_code"] == "INVALID_PHOTOS"

@@ -10,7 +10,7 @@ import base64
 import hashlib
 import secrets
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from sellr.config.config import get_sellr_config
@@ -27,7 +27,7 @@ class PhotoError(Exception):
 
 
 def _utcnow() -> datetime:
-    return datetime.utcnow()
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def _token_hash(token: str) -> str:

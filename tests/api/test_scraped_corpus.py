@@ -1,6 +1,6 @@
 """Scraped listings persist into the f1ndr corpus and surface in search/unified/raw."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -324,10 +324,10 @@ async def test_notification_retry_gives_up(mailer, monkeypatch):
 
     # Stale matches and matches of deleted alerts are dropped, not emailed.
     mailer.up = True
-    old = (datetime.utcnow() - watchr_core.NOTIFY_RETRY_WINDOW - timedelta(hours=1)).isoformat()
+    old = (datetime.now(timezone.utc).replace(tzinfo=None) - watchr_core.NOTIFY_RETRY_WINDOW - timedelta(hours=1)).isoformat()
     await watchr_core.matches_store.update(record["id"], {"notify_pending": True, "notify_attempts": 1, "matched_at": old})
     assert await watchr_core.retry_pending_notifications() == {"retried": 0, "sent": 0, "abandoned": 1}
-    await watchr_core.matches_store.update(record["id"], {"notify_pending": True, "matched_at": datetime.utcnow().isoformat()})
+    await watchr_core.matches_store.update(record["id"], {"notify_pending": True, "matched_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat()})
     await watchr_core.delete_alert(alert["alert_id"])
     assert await watchr_core.retry_pending_notifications() == {"retried": 0, "sent": 0, "abandoned": 1}
     assert mailer.sent == []
@@ -376,6 +376,41 @@ def test_facebook_marketplace_is_never_scraped(client, headers_for):
     assert not [name for name, cls in SCRAPER_CLASSES.items() if "facebook.com" in cls.base_url]
     resp = client.post(f"{API}/scrapers/search", json={"platforms": ["facebook"]}, headers=headers_for("admin"))
     assert resp.status_code == 422
+
+
+async def test_evaluate_listings_fetches_alerts_once(mailer, monkeypatch):
+    """The active-alerts query is hoisted out of the per-listing loop."""
+    from watchr.core import core as watchr_core
+
+    await watchr_core.create_alert({"name": "Civics", "query": "civic", "user_id": "u-batch"})
+    calls = 0
+    original = watchr_core.alerts_store.find
+
+    async def spy(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return await original(*args, **kwargs)
+
+    monkeypatch.setattr(watchr_core.alerts_store, "find", spy)
+    listings = [{"id": f"kijiji:{i}", "title": f"Honda Civic {i}"} for i in range(3)]
+    assert await watchr_core.evaluate_listings(listings) == 3
+    assert calls == 1
+    assert await watchr_core.evaluate_listings([]) == 0
+
+
+async def test_evaluate_listings_isolates_bad_docs(mailer):
+    """One malformed doc must not abort the rest of the batch."""
+    from watchr.core import core as watchr_core
+
+    await watchr_core.create_alert({"name": "Civics", "query": "civic", "user_id": "u-iso"})
+
+    class BadDoc:
+        def get(self, *args, **kwargs):
+            raise RuntimeError("corrupt doc")
+
+    assert await watchr_core.evaluate_listings([BadDoc(), {"id": "kijiji:ok", "title": "Honda Civic"}]) == 1
+    [record] = await watchr_core.matches_store.find({"user_id": "u-iso"})
+    assert record["listing_id"] == "kijiji:ok"
 
 
 @pytest.mark.asyncio

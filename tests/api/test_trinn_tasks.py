@@ -1,6 +1,6 @@
 """Scheduled-task management endpoints: list, get, delete, scheduler state, persistence."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -212,7 +212,7 @@ async def test_due_task_queued_once_while_running():
 
     scheduler = TrinnScheduler()
     await scheduler.schedule_interval({"task": "vin", "vin": VIN}, 1, task_id="t1",
-                                      next_run=datetime.utcnow() - timedelta(minutes=1))
+                                      next_run=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=1))
     assert await scheduler._queue_due_tasks() == 1
     assert await scheduler._queue_due_tasks() == 0
     assert scheduler.task_queue.qsize() == 1
@@ -223,7 +223,7 @@ async def test_removed_task_already_queued_is_skipped():
 
     scheduler = TrinnScheduler()
     await scheduler.schedule_interval({"task": "vin", "vin": VIN}, 1, task_id="t1",
-                                      next_run=datetime.utcnow() - timedelta(minutes=1))
+                                      next_run=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=1))
     await scheduler._queue_due_tasks()
     queued = scheduler.task_queue.get_nowait()
     assert await scheduler.remove_task("t1")
@@ -243,12 +243,12 @@ async def test_run_state_persisted_and_restored(monkeypatch):
 
         doc = await tasks_store.get(task_id)
         assert doc["run_count"] == 1 and "decoder down" in doc["last_error"] and doc["last_run"]
-        assert datetime.fromisoformat(doc["next_run"]) > datetime.utcnow() + timedelta(hours=4)
+        assert datetime.fromisoformat(doc["next_run"]) > datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=4)
 
         await scheduler.remove_task(task_id)  # simulate restart losing in-memory state
         await restore_scheduled_tasks()
         restored = scheduler.scheduled_tasks[task_id]
-        assert restored.run_count == 1 and restored.next_run > datetime.utcnow()
+        assert restored.run_count == 1 and restored.next_run > datetime.now(timezone.utc).replace(tzinfo=None)
 
         got = await core.get_scheduled_task(task_id)
         assert got["run_count"] == 1 and "decoder down" in got["last_error"]

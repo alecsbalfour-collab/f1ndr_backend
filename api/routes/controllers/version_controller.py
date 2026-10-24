@@ -41,5 +41,5 @@ async def version_info():
 
 def _get_timestamp():
     """Get current timestamp in ISO format."""
-    from datetime import datetime
-    return datetime.utcnow().isoformat()
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
