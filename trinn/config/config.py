@@ -40,6 +40,12 @@ class TrinnConfig:
     
     # Supported platforms
     supported_platforms: List[str] = None
+
+    # Optional outbound LLM completion (OpenAI-compatible /v1/chat/completions
+    # or Anthropic /v1/messages). Unset = built-in tool+memory synthesis.
+    llm_url: Optional[str] = None
+    llm_api_key: Optional[str] = None
+    llm_model: Optional[str] = None
     
     def __post_init__(self):
         if self.supported_platforms is None:
@@ -58,5 +64,8 @@ def get_trinn_config() -> Dict[str, Any]:
         retry_delay=float(os.getenv("TRINN_RETRY_DELAY", "1.0")),
         batch_size=int(os.getenv("TRINN_BATCH_SIZE", "100")),
         log_level=os.getenv("TRINN_LOG_LEVEL", "INFO"),
+        llm_url=os.getenv("TRINN_LLM_URL"),
+        llm_api_key=os.getenv("TRINN_LLM_API_KEY"),
+        llm_model=os.getenv("TRINN_LLM_MODEL"),
     ))
 

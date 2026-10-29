@@ -94,3 +94,86 @@ class TrinnConfig(BaseModel):
     retry_delay: float
     batch_size: int
     supported_platforms: List[str]
+
+
+# ---- Trinn AI brain ----
+
+MemoryKind = Literal["lesson", "correction", "fact", "preference"]
+MemoryTopic = Literal["general", "pricing", "fraud", "vehicles", "rvs", "copywriting", "operations"]
+SessionMode = Literal["assistant", "mentor"]
+
+
+class MemoryCreate(BaseModel):
+    kind: MemoryKind = "lesson"
+    topic: MemoryTopic = "general"
+    content: str = Field(..., min_length=1, max_length=4000)
+    context: Optional[str] = Field(None, max_length=2000)
+    weight: int = Field(5, ge=1, le=10)
+
+
+class MemoryOut(Record):
+    id: Optional[str] = None
+    kind: Optional[str] = None
+    topic: Optional[str] = None
+    content: Optional[str] = None
+    context: Optional[str] = None
+    weight: Optional[int] = None
+    author_id: Optional[str] = None
+    use_count: Optional[int] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=4000)
+    session_id: Optional[str] = None
+    mode: SessionMode = "assistant"
+    teach: bool = False
+
+
+class MessageOut(Record):
+    id: Optional[str] = None
+    role: Optional[str] = None
+    content: Optional[str] = None
+    timestamp: Optional[str] = None
+    tool_calls: Optional[List[str]] = None
+    memories_used: Optional[List[str]] = None
+    feedback: Optional[str] = None
+
+
+class SessionOut(Record):
+    id: Optional[str] = None
+    user_id: Optional[str] = None
+    title: Optional[str] = None
+    mode: Optional[str] = None
+    messages: Optional[List[MessageOut]] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class ChatResponse(Record):
+    session_id: str
+    reply: str
+    tool_calls: Optional[List[Dict[str, Any]]] = None
+    memories_used: Optional[List[MemoryOut]] = None
+    learned_memory: Optional[MemoryOut] = None
+
+
+class FeedbackRequest(BaseModel):
+    session_id: str
+    message_id: str
+    rating: Literal["up", "down"]
+    correction: Optional[str] = Field(None, max_length=4000)
+
+
+class FeedbackResult(Record):
+    recorded: bool
+    learned_memory: Optional[MemoryOut] = None
+
+
+class TrinnBrainStats(Record):
+    total_memories: int
+    memories_by_topic: Dict[str, int]
+    total_sessions: int
+    total_recalls: int
+    llm_provider: Optional[str] = None
