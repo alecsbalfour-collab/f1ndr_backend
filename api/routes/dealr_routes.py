@@ -8,7 +8,14 @@ from fastapi import APIRouter, Depends, Query
 from typing import Any, Dict, Optional
 from api.dependencies.auth import is_admin, owns, require_scopes
 from api.schemas.common import Envelope, ModuleStatus, Page, error_responses, ok, paged
-from api.schemas.dealr_schemas import InventoryCreate, InventoryIn, InventoryItem
+from api.schemas.dealr_schemas import (
+    InventoryCreate,
+    InventoryIn,
+    InventoryItem,
+    InventoryPricingOut,
+    InventoryPricingRequest,
+)
+from f1ndr.intelligence.market import estimate_market_price
 from api.schemas.list_schemas import Category, OptCategory, OptSubcategory, Subcategory
 from utils.response_builder import error_response
 from dealr.config.dealr_config import dealr_config
@@ -73,6 +80,11 @@ async def get_inventory(
     status: Optional[str] = None,
     category: OptCategory = None,
     subcategory: OptSubcategory = None,
+    sleeps_min: Optional[int] = None,
+    length_max: Optional[float] = None,
+    max_dry_weight: Optional[int] = None,
+    slide_outs_min: Optional[int] = None,
+    hitch_type: Optional[str] = None,
     claims: Dict[str, Any] = Depends(_READER),
 ):
     """
@@ -92,7 +104,10 @@ async def get_inventory(
     # Dealers see their own inventory; admins see everything.
     owner_id = None if is_admin(claims) else claims["sub"]
     result = await inventory_repo.list_inventory(
-        status, page, page_size, owner_id=owner_id, category=category, subcategory=subcategory
+        status, page, page_size, owner_id=owner_id, category=category, subcategory=subcategory,
+        rv={k: v for k, v in {"sleeps_min": sleeps_min, "length_max": length_max,
+                              "max_dry_weight": max_dry_weight, "slide_outs_min": slide_outs_min,
+                              "hitch_type": hitch_type}.items() if v is not None},
     )
     return paged(result["items"], result["total"], page, page_size, "Inventory retrieved")
 
@@ -137,3 +152,13 @@ async def delete_inventory(inventory_id: str, claims: Dict[str, Any] = Depends(_
         return _not_found()
     await cancel_listing_sync(inventory_id)
     return ok(message="Inventory deleted successfully")
+
+
+@router.post("/pricing", response_model=Envelope[InventoryPricingOut],
+             responses=error_responses(401, 403))
+async def inventory_pricing(request: InventoryPricingRequest,
+                            claims: Dict[str, Any] = Depends(_READER)):
+    """Market comps for a vehicle the dealer is pricing: local-corpus median,
+    p25/p75 spread, suggested range, and top comparable listings."""
+    data = await estimate_market_price(request.to_data())
+    return ok(data, "Pricing estimated")

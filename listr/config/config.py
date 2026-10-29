@@ -11,7 +11,8 @@ def get_listr_config() -> dict:
             "kijiji",
             "autotrader",
             "craigslist",
-            "ebay"
+            "ebay",
+            "rvtrader"
         ],
         "max_title_length": 120,
         "sync_enabled": True,

@@ -35,7 +35,7 @@ def _region(slug: str, label: str, prov: str, province_name: str,
             zillow_slug: Optional[str] = None) -> dict:
     """Assemble one region's platform map from per-site parameters."""
     prov_u = prov.upper()
-    platforms: Dict[str, dict] = {"used": {}, "ebay": {}}
+    platforms: Dict[str, dict] = {"used": {}, "ebay": {}, "rvtrader": {}}
     if kijiji_city and kijiji_loc:
         platforms["kijiji"] = {"city": kijiji_city, "loc": kijiji_loc}
     if cl_sub:

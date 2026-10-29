@@ -2,7 +2,7 @@ import uuid
 
 from sellr.config.config import get_listings_config
 from f1ndr.vin.decode import decode_vin
-from f1ndr.intelligence.market import compute_market_value
+from f1ndr.intelligence.market import estimate_market_price
 from listr.core.core import push_listing
 from watchr.core.core import register_listing_alerts
 from trinn.core.core import schedule_sync
@@ -33,11 +33,11 @@ def autofill_from_vin(data: dict, config: dict) -> dict:
     return {**data, **decoded}
 
 
-def apply_auto_pricing(data: dict, config: dict) -> dict:
+async def apply_auto_pricing(data: dict, config: dict) -> dict:
     if not config["auto_price"]:
         return data
 
-    market_value = compute_market_value(data)
+    market_value = (await estimate_market_price(data))["market_value"]
     if not market_value:
         return data
     floor = market_value * config["price_floor_percent"]
@@ -70,7 +70,7 @@ async def create_listing(data: dict) -> dict:
     # Assigned up front so the sync task can reference the listing; save_listing keeps it.
     listing = {**validate_listing(data, config), "id": data.get("id") or str(uuid.uuid4())}
     listing = autofill_from_vin(listing, config)
-    listing = apply_auto_pricing(listing, config)
+    listing = await apply_auto_pricing(listing, config)
     await push_to_marketplaces(listing, config)
     await setup_alerts(listing, config)
     await schedule_listing_sync(listing, config)

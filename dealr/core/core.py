@@ -1,7 +1,7 @@
 from dealr.config.dealr_config import get_dealr_config
 from dealr.db.inventory_repo import get_inventory, save_inventory, update_inventory_db
 from f1ndr.vin.decode import decode_vin
-from f1ndr.intelligence.market import compute_market_value
+from f1ndr.intelligence.market import estimate_market_price
 from listr.core.core import update_listing
 from trinn.core.core import schedule_sync
 
@@ -14,7 +14,9 @@ async def ingest_inventory(data: dict) -> dict:
         data.update(decoded)
 
     if config["enable_market_value"]:
-        data["market_value"] = compute_market_value(data)
+        pricing = await estimate_market_price(data)
+        data["market_value"] = pricing["market_value"]
+        data["pricing"] = pricing
 
     await save_inventory(data)
     return data

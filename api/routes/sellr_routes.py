@@ -137,7 +137,12 @@ async def get_listings(
     status: Optional[str] = None,
     platform: Optional[str] = None,
     category: OptCategory = None,
-    subcategory: OptSubcategory = None
+    subcategory: OptSubcategory = None,
+    sleeps_min: Optional[int] = None,
+    length_max: Optional[float] = None,
+    max_dry_weight: Optional[int] = None,
+    slide_outs_min: Optional[int] = None,
+    hitch_type: Optional[str] = None
 ):
     """
     Get listings with FlutterFlow-compatible pagination and filtering.
@@ -163,6 +168,9 @@ async def get_listings(
         {"user_id": user_id, "status": status, "platform": platform,
          "category": category, "subcategory": subcategory},
         page, page_size,
+        rv={k: v for k, v in {"sleeps_min": sleeps_min, "length_max": length_max,
+                              "max_dry_weight": max_dry_weight, "slide_outs_min": slide_outs_min,
+                              "hitch_type": hitch_type}.items() if v is not None},
     )
     return paged(result["listings"], result["total"], page, page_size, "Listings retrieved")
 

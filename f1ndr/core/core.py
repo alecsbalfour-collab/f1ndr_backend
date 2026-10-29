@@ -11,6 +11,7 @@ from f1ndr.utils.utils import (
     compute_market_value,
     detect_duplicates,
     detect_fraud,
+    rv_matches,
 )
 
 
@@ -33,6 +34,11 @@ async def run_search(params: dict) -> dict:
     region = params.get("region")
     location = (params.get("location") or "").lower().strip()
     text = (params.get("text") or "").lower().strip()
+    sleeps_min = params.get("sleeps_min")
+    length_max = params.get("length_max")
+    max_dry_weight = params.get("max_dry_weight")
+    slide_outs_min = params.get("slide_outs_min")
+    hitch_type = params.get("hitch_type")
 
     # Push exact-equality filters into the store query. Legacy docs missing
     # category/subcategory read as "other" in matches(), so those two only go
@@ -50,6 +56,10 @@ async def run_search(params: dict) -> dict:
     listings = await query_listings(db_query)
 
     def matches(l: dict) -> bool:
+        if not rv_matches(l, sleeps_min=sleeps_min, length_max=length_max,
+                          max_dry_weight=max_dry_weight, slide_outs_min=slide_outs_min,
+                          hitch_type=hitch_type):
+            return False
         # Listings without a category/subcategory land in "other" rather than guessing.
         if category and (l.get("category") or "other") != category:
             return False
@@ -111,7 +121,9 @@ async def run_intelligence(listing: dict) -> dict:
         result["vin"] = decode_vin(listing["vin"])
 
     if config["enable_market_value"]:
-        result["market_value"] = compute_market_value(listing)
+        pricing = await estimate_market_price(listing)
+        result["market_value"] = pricing["market_value"]
+        result["pricing"] = pricing
 
     if config["enable_duplicates"]:
         all_listings = await query_listings()

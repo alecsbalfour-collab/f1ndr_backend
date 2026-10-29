@@ -41,12 +41,18 @@ async def list_inventory(
     owner_id: Optional[str] = None,
     category: Optional[str] = None,
     subcategory: Optional[str] = None,
+    rv: Optional[dict] = None,
 ) -> dict:
     query = {
         k: v
         for k, v in {"status": status, "owner_id": owner_id, "category": category, "subcategory": subcategory}.items()
         if v
     }
+    if rv:
+        from f1ndr.utils.utils import rv_matches
+        docs = await inventory_store.find(query, limit=10_000, sort=("created_at", -1))
+        docs = [d for d in docs if rv_matches(d, **rv)]
+        return {"items": docs[(page - 1) * page_size: page * page_size], "total": len(docs)}
     items = await inventory_store.find(query, skip=(page - 1) * page_size, limit=page_size, sort=("created_at", -1))
     return {"items": items, "total": await inventory_store.count(query)}
 

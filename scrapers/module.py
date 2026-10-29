@@ -21,6 +21,7 @@ from scrapers.neighbourhood_scraper import NeighbourhoodScraper
 from scrapers.realtor_scraper import RealtorScraper
 from scrapers.rentals_scraper import RentalsScraper
 from scrapers.rentfaster_scraper import RentFasterScraper
+from scrapers.rvtrader_scraper import RVTraderScraper
 from scrapers.used_scraper import UsedScraper
 from scrapers.usedca_scraper import UsedCAScraper
 from scrapers.zillow_scraper import ZillowScraper
@@ -38,6 +39,7 @@ SCRAPER_CLASSES: Dict[str, Type[BaseScraper]] = {
     "realtor": RealtorScraper,
     "rentals": RentalsScraper,
     "rentfaster": RentFasterScraper,
+    "rvtrader": RVTraderScraper,
     "used": UsedScraper,
     "usedca": UsedCAScraper,
     "zillow": ZillowScraper,

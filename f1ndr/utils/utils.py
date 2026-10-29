@@ -30,6 +30,28 @@ def normalize_listing(listing: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+def rv_matches(
+    listing: Dict[str, Any],
+    sleeps_min: Optional[int] = None,
+    length_max: Optional[float] = None,
+    max_dry_weight: Optional[int] = None,
+    slide_outs_min: Optional[int] = None,
+    hitch_type: Optional[str] = None,
+) -> bool:
+    """Shared RV attribute filter for search/unified/sellr/dealr listing queries."""
+    if sleeps_min is not None and (listing.get("sleeps") or 0) < sleeps_min:
+        return False
+    if length_max is not None and (listing.get("length_ft") is None or listing["length_ft"] > length_max):
+        return False
+    if max_dry_weight is not None and (listing.get("dry_weight_lbs") is None or listing["dry_weight_lbs"] > max_dry_weight):
+        return False
+    if slide_outs_min is not None and (listing.get("slide_outs") or 0) < slide_outs_min:
+        return False
+    if hitch_type and (listing.get("hitch_type") or "") != hitch_type:
+        return False
+    return True
+
+
 def decode_vin(vin: str) -> Dict[str, Any]:
     """
     Very simple VIN decode stub: extracts year and manufacturer hints.

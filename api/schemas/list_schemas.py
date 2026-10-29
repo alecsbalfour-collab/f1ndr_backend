@@ -6,6 +6,7 @@ from pydantic import BaseModel, BeforeValidator, Field, model_validator
 from typing_extensions import Annotated
 
 from api.schemas.common import LooseVIN, OpenPayload, Record
+from dealr.core.validation_core import TOWABLE_SUBCATEGORIES, validate_rv_fields
 from listr.config.config import get_listr_config
 
 ListrPlatform = Literal[tuple(get_listr_config()["supported_platforms"])]
@@ -41,6 +42,19 @@ class VehicleIn(OpenPayload):
     price: Optional[float] = Field(None, ge=0)
     mileage: Optional[int] = Field(None, ge=0)
     location: Optional[str] = Field(None, max_length=200)
+    # RV / towable attributes
+    length_ft: Optional[float] = Field(None, gt=0, le=100)
+    dry_weight_lbs: Optional[int] = Field(None, ge=0, le=50_000)
+    gvwr_lbs: Optional[int] = Field(None, ge=0, le=80_000)
+    sleeps: Optional[int] = Field(None, ge=1, le=30)
+    slide_outs: Optional[int] = Field(None, ge=0, le=10)
+    hitch_type: Optional[Literal["bumper_pull", "fifth_wheel", "gooseneck", "truck_bed", "none"]] = None
+    fresh_water_gal: Optional[float] = Field(None, ge=0)
+    grey_water_gal: Optional[float] = Field(None, ge=0)
+    black_water_gal: Optional[float] = Field(None, ge=0)
+    # Motorized-only attributes
+    engine: Optional[str] = Field(None, max_length=100)
+    chassis: Optional[str] = Field(None, max_length=100)
 
     @model_validator(mode="after")
     def _subcategory_belongs_to_category(self) -> "VehicleIn":
@@ -48,6 +62,12 @@ class VehicleIn(OpenPayload):
         # A missing category means a partial update, where the stored doc decides.
         if self.subcategory not in (None, "other") and self.category not in (None, "vehicles"):
             raise ValueError(f"subcategory '{self.subcategory}' requires category 'vehicles'")
+        if self.subcategory in TOWABLE_SUBCATEGORIES and any(
+            getattr(self, f) is not None for f in ("mileage", "engine", "chassis")
+        ):
+            raise ValueError("Towable units cannot specify mileage, engine, or chassis")
+        if self.gvwr_lbs is not None and self.dry_weight_lbs is not None and self.gvwr_lbs < self.dry_weight_lbs:
+            raise ValueError("gvwr_lbs must not be less than dry_weight_lbs")
         return self
 
 
@@ -67,6 +87,18 @@ class VehicleOut(Record):
     mileage: Optional[int] = None
     location: Optional[str] = None
     market_value: Optional[float] = None
+    # RV / towable + motorized attributes
+    length_ft: Optional[float] = None
+    dry_weight_lbs: Optional[int] = None
+    gvwr_lbs: Optional[int] = None
+    sleeps: Optional[int] = None
+    slide_outs: Optional[int] = None
+    hitch_type: Optional[str] = None
+    fresh_water_gal: Optional[float] = None
+    grey_water_gal: Optional[float] = None
+    black_water_gal: Optional[float] = None
+    engine: Optional[str] = None
+    chassis: Optional[str] = None
     # Corpus/scrape metadata (present on scraped listings and pushed copies).
     platform: Optional[str] = None
     region: Optional[str] = None

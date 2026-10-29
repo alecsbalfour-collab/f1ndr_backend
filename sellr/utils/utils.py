@@ -68,9 +68,18 @@ async def list_listings(
     filters: Optional[Dict[str, Any]] = None,
     page: int = 1,
     page_size: int = 20,
+    rv: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Paginated listing query with equality filters (None values ignored)."""
+    """Paginated listing query with equality filters (None values ignored).
+    `rv` carries RV attribute filters applied post-query (range/exact mixes)."""
+    from f1ndr.utils.utils import rv_matches
+
     query = {k: v for k, v in (filters or {}).items() if v is not None}
+    if rv:
+        docs = await listings_store.find(query, limit=10_000, sort=("created_at", -1))
+        docs = [d for d in docs if rv_matches(d, **rv)]
+        return {"listings": docs[(page - 1) * page_size: page * page_size],
+                "total": len(docs), "page": page, "page_size": page_size}
     results = await listings_store.find(query, skip=(page - 1) * page_size, limit=page_size, sort=("created_at", -1))
     total = await listings_store.count(query)
     return {"listings": results, "total": total, "page": page, "page_size": page_size}

@@ -19,7 +19,7 @@ from api.schemas.list_schemas import (
 from dealr.db.inventory_repo import inventory_store
 from f1ndr.data.external_search import external_search_links
 from f1ndr.db.db import listings_store as f1ndr_store
-from f1ndr.utils.utils import group_equivalent_listings
+from f1ndr.utils.utils import group_equivalent_listings, rv_matches
 from listr.db.listing_repo import listings_store as listr_store
 from sellr.utils.utils import listings_store as sellr_store
 
@@ -40,7 +40,12 @@ async def get_unified_listings(
     max_price: Optional[float] = None,
     region: Optional[str] = None,
     location: Optional[str] = None,
-    platform: Optional[str] = None
+    platform: Optional[str] = None,
+    sleeps_min: Optional[int] = None,
+    length_max: Optional[float] = None,
+    max_dry_weight: Optional[int] = None,
+    slide_outs_min: Optional[int] = None,
+    hitch_type: Optional[str] = None
 ):
     """
     Get unified listings from all platforms with FlutterFlow-compatible pagination.
@@ -72,6 +77,9 @@ async def get_unified_listings(
         docs = [d for d in docs if (d.get("price") or 0) >= min_price]
     if max_price is not None:
         docs = [d for d in docs if (d.get("price") or 0) <= max_price]
+    docs = [d for d in docs if rv_matches(d, sleeps_min=sleeps_min, length_max=length_max,
+                                          max_dry_weight=max_dry_weight, slide_outs_min=slide_outs_min,
+                                          hitch_type=hitch_type)]
 
     docs.sort(key=lambda d: d.get("scraped_at") or d.get("created_at") or "", reverse=True)
     total = len(docs)

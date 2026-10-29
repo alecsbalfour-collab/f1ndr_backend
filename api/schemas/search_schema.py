@@ -1,6 +1,6 @@
 """f1ndr models: VIN decode, listing search, intelligence and market value."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -37,6 +37,12 @@ class SearchRequest(BaseModel):
     text: Optional[str] = Field(None, max_length=200)
     region: Optional[str] = Field(None, max_length=100)
     location: Optional[str] = Field(None, max_length=200)
+    # RV / towable filters
+    sleeps_min: Optional[int] = Field(None, ge=1, le=30)
+    length_max: Optional[float] = Field(None, gt=0, le=100)
+    max_dry_weight: Optional[int] = Field(None, ge=0)
+    slide_outs_min: Optional[int] = Field(None, ge=0, le=10)
+    hitch_type: Optional[Literal["bumper_pull", "fifth_wheel", "gooseneck", "truck_bed", "none"]] = None
 
     @model_validator(mode="after")
     def _ranges(self) -> "SearchRequest":

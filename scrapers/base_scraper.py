@@ -45,6 +45,25 @@ _URL_CATEGORY_HINTS = (
     ("/v-real-estate/", "real_estate"),
     ("/apa/", "real_estate"),
     ("/rea/", "real_estate"),
+    # RV ads are vehicles on this platform family.
+    ("/v-rv-", "vehicles"),
+    ("/v-travel-trailer", "vehicles"),
+    ("/v-motorhome", "vehicles"),
+    ("/rvs/", "vehicles"),
+    ("rvtrader.com", "vehicles"),
+)
+
+# Subcategory inference from listing URL/title — RV kinds only for now.
+_SUBCATEGORY_HINTS = (
+    (("fifth wheel", "fifth-wheel", "/v-fifth-wheel", "5th wheel"), "fifth_wheel"),
+    (("travel trailer", "travel-trailer", "/v-travel-trailer"), "travel_trailer"),
+    (("toy hauler", "toy-hauler", "/v-toy-hauler"), "toy_hauler"),
+    (("truck camper", "truck-camper", "/v-truck-camper"), "truck_camper"),
+    (("class a", "class-a", "diesel pusher"), "motorhome_a"),
+    (("class b", "class-b", "camper van", "campervan"), "motorhome_b"),
+    (("class c", "class-c"), "motorhome_c"),
+    (("motorcycle", "/v-motorcycles"), "motorcycle"),
+    (("sedan", "/v-cars-trucks"), "car"),
 )
 
 
@@ -133,6 +152,14 @@ class BaseScraper:
                 return category
         return self.default_category
 
+    def infer_subcategory(self, listing: Dict[str, Any]) -> Optional[str]:
+        """Guess a vehicle subcategory from the listing's URL + title."""
+        blob = f"{listing.get('url') or ''} {listing.get('title') or ''}".lower()
+        for keywords, subcategory in _SUBCATEGORY_HINTS:
+            if any(k in blob for k in keywords):
+                return subcategory
+        return None
+
     def parse(self, html: str, query: Optional[str] = None) -> List[Dict[str, Any]]:
         soup = BeautifulSoup(html, "html.parser")
         listings: List[Dict[str, Any]] = []
@@ -151,6 +178,10 @@ class BaseScraper:
             listing["price_value"] = parse_price(listing.get("price"))
             listing["platform"] = self.source_name
             listing["category"] = self.classify_listing(listing, query)
+            if not listing.get("subcategory"):
+                sub = self.infer_subcategory(listing)
+                if sub:
+                    listing["subcategory"] = sub
             listings.append(listing)
         return listings
 
