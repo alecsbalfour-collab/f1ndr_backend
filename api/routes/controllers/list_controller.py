@@ -38,7 +38,8 @@ async def get_unified_listings(
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
     region: Optional[str] = None,
-    location: Optional[str] = None
+    location: Optional[str] = None,
+    platform: Optional[str] = None
 ):
     """
     Get unified listings from all platforms with FlutterFlow-compatible pagination.
@@ -57,7 +58,7 @@ async def get_unified_listings(
     """
     logger.info(f"Getting unified listings - page: {page}, filters: {search}, {category}, {subcategory}")
 
-    docs = await _merged_listing_docs(category=category, subcategory=subcategory, region=region)
+    docs = await _merged_listing_docs(category=category, subcategory=subcategory, region=region, platform=platform)
 
     if search:
         needle = search.lower()
@@ -78,12 +79,15 @@ async def get_unified_listings(
     return paged(results, total, page, page_size, "Unified listings retrieved")
 
 
-async def _merged_listing_docs(category=None, subcategory=None, region=None) -> list:
+async def _merged_listing_docs(category=None, subcategory=None, region=None, platform=None) -> list:
     """Sellr + listr + scraped-corpus docs, deduped by listing id."""
     query = {k: v for k, v in {"category": category, "subcategory": subcategory, "region": region}.items() if v}
+    platforms = _PLATFORM_ALIASES.get(platform, {platform}) if platform else None
     seen, docs = set(), []
     for store in (sellr_store, listr_store, f1ndr_store):
         for doc in await store.find(query, limit=10_000):
+            if platforms and doc.get("platform") not in platforms:
+                continue
             key = doc.get("id") or doc.get("key") or id(doc)
             if key not in seen:
                 seen.add(key)

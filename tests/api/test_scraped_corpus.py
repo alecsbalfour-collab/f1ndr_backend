@@ -413,6 +413,78 @@ async def test_evaluate_listings_isolates_bad_docs(mailer):
     assert record["listing_id"] == "kijiji:ok"
 
 
+async def test_unified_platform_filter_and_alias(client):
+    await save_scraped_listings(
+        [{"title": "Kijiji car", "price_value": 1.0, "url": "https://www.kijiji.ca/v-cars-trucks/calgary/x/1"}],
+        platform="kijiji",
+    )
+    await save_scraped_listings(
+        [{"title": "House", "price_value": 2.0, "url": "https://www.realtor.ca/ab/calgary/h/2"}],
+        platform="realtor",
+        category="real_estate",
+    )
+    await save_scraped_listings(
+        [{"title": "FB item", "price_value": 3.0, "url": "https://www.facebook.com/marketplace/item/3"}],
+        platform="facebook_marketplace",
+    )
+
+    only_kijiji = client.get(f"{API}/listings/unified", params={"platform": "kijiji"}).json()["data"]
+    assert only_kijiji and all(d["platform"] == "kijiji" for d in only_kijiji)
+
+    # "facebook" is an alias for the scraped "facebook_marketplace" platform name.
+    fb = client.get(f"{API}/listings/unified", params={"platform": "facebook"}).json()["data"]
+    assert fb and all(d["platform"] == "facebook_marketplace" for d in fb)
+
+
+def test_parse_unescapes_entities_and_extracts_image():
+    from bs4 import BeautifulSoup
+    from scrapers.kijiji_scraper import KijijiScraper
+
+    html = """
+    <div data-testid="listing-card">
+      <a data-testid="listing-link" href="/v-cars-trucks/calgary/f150/111">
+        <span data-testid="listing-title">F-150 XLT 4WD SuperCrew 5.5&amp;apos; Box</span>
+        <img src="https://cdn.kijiji.ca/img/111.jpg" data-src="https://cdn.kijiji.ca/lazy/111.jpg">
+      </a>
+    </div>
+    """
+    [card] = BeautifulSoup(html, "html.parser").select(KijijiScraper.card_selector)
+    listing = KijijiScraper().parse_card(card)
+    assert listing["title"].endswith("5.5' Box")
+    assert listing["image"] == "https://cdn.kijiji.ca/img/111.jpg"
+
+
+def test_classify_listing_by_url():
+    from scrapers.craigslist_scraper import CraigslistScraper
+    from scrapers.kijiji_scraper import KijijiScraper
+
+    kijiji = KijijiScraper()
+    # Browse mode (query=None): the /b-cars-trucks/ base URL itself hints vehicles.
+    assert kijiji.classify_listing({"url": "https://www.kijiji.ca/x/1"}) == "vehicles"
+    assert kijiji.classify_listing(
+        {"url": "https://www.kijiji.ca/v-apartments-condos-for-rent/calgary/1br/2"}, query="condo"
+    ) == "real_estate"
+
+    craigslist = CraigslistScraper()
+    assert craigslist.classify_listing({"url": "https://calgary.craigslist.org/cto/d/x/1.html"}) == "vehicles"
+    assert craigslist.classify_listing({"url": "https://calgary.craigslist.org/apa/d/x/2.html"}) == "real_estate"
+    assert craigslist.classify_listing({"url": "https://calgary.craigslist.org/fuo/d/x/3.html"}) == "other"
+
+
+def test_parse_stamps_inferred_category():
+    from scrapers.kijiji_scraper import KijijiScraper
+
+    html = """
+    <div data-testid="listing-card">
+      <a data-testid="listing-link" href="/v-cars-trucks/calgary/f150/111">
+        <span data-testid="listing-title">F-150</span>
+      </a>
+    </div>
+    """
+    [listing] = KijijiScraper().parse(html, query="truck")
+    assert listing["category"] == "vehicles"
+
+
 @pytest.mark.asyncio
 async def test_matches_route_scoped_to_user(client, headers_for):
     from watchr.core import core as watchr_core

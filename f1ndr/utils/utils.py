@@ -3,6 +3,7 @@ Utility functions for f1ndr.
 """
 
 import hashlib
+import html
 import re
 from typing import Dict, List, Any, Optional
 import math
@@ -16,7 +17,8 @@ def normalize_listing(listing: Dict[str, Any]) -> Dict[str, Any]:
 
     for key in ["title", "description", "make", "model", "location"]:
         if key in out and isinstance(out[key], str):
-            out[key] = out[key].strip()
+            # Double-unescape: scraped values arrive doubly-encoded on some platforms.
+            out[key] = html.unescape(html.unescape(out[key].strip()))
 
     for key in ["year", "price", "mileage"]:
         if key in out and out[key] is not None:

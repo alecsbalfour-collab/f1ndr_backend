@@ -10,6 +10,7 @@ Every run() returns the same dict shape and never raises:
 """
 
 import asyncio
+import html
 import logging
 import random
 import time
@@ -30,6 +31,20 @@ from scrapers.db.cache_db import cache_get, cache_set
 logger = logging.getLogger(__name__)
 
 MAX_QUERY_LENGTH = 200
+
+# URL-path hints for multi-vertical sites whose cards carry no category field.
+# Checked against the listing URL and the page being scraped (browse URLs count).
+_URL_CATEGORY_HINTS = (
+    ("/v-cars-trucks/", "vehicles"),
+    ("/v-autos-other/", "vehicles"),
+    ("/b-cars-trucks/", "vehicles"),
+    ("/cto/", "vehicles"),
+    ("/ctd/", "vehicles"),
+    ("/v-apartments-condos-for-rent/", "real_estate"),
+    ("/v-real-estate/", "real_estate"),
+    ("/apa/", "real_estate"),
+    ("/rea/", "real_estate"),
+)
 
 
 class ScrapeError(RuntimeError):
@@ -83,15 +98,31 @@ class BaseScraper:
     @staticmethod
     def text(node: Tag, selector: str) -> Optional[str]:
         element = node.select_one(selector)
-        return (element.get_text(" ", strip=True) or None) if element else None
+        if not element:
+            return None
+        # Double-unescape: platforms ship doubly-encoded entities (e.g. &amp;#x27;).
+        return html.unescape(html.unescape(element.get_text(" ", strip=True))) or None
 
     def parse_card(self, card: Tag) -> Optional[Dict[str, Any]]:
         listing = {name: self.text(card, selector) for name, selector in self.fields.items()}
         link = card if card.name == "a" and card.get("href") else card.select_one(self.link_selector)
         listing["url"] = self.absolute_url(link.get("href")) if link else None
+        if not listing.get("image"):
+            img = card.select_one("img[src], img[data-src]")
+            if img:
+                listing["image"] = self.absolute_url(img.get("src") or img.get("data-src"))
         return listing
 
-    def parse(self, html: str) -> List[Dict[str, Any]]:
+    def classify_listing(self, listing: Dict[str, Any], query: Optional[str] = None) -> str:
+        """Infer a listing's category from URL-path hints (the listing's own URL
+        and the page being scraped); falls back to the scraper's default_category."""
+        blob = " ".join(p for p in (listing.get("url"), self.build_url(query)) if p)
+        for pattern, category in _URL_CATEGORY_HINTS:
+            if pattern in blob:
+                return category
+        return self.default_category
+
+    def parse(self, html: str, query: Optional[str] = None) -> List[Dict[str, Any]]:
         soup = BeautifulSoup(html, "html.parser")
         listings: List[Dict[str, Any]] = []
         seen_urls = set()
@@ -108,6 +139,7 @@ class BaseScraper:
             seen_urls.add(listing["url"])
             listing["price_value"] = parse_price(listing.get("price"))
             listing["platform"] = self.source_name
+            listing["category"] = self.classify_listing(listing, query)
             listings.append(listing)
         return listings
 
@@ -225,7 +257,7 @@ class BaseScraper:
 
         try:
             logger.info("%s: scraping %s", self.source_name, url)
-            listings = self.parse(await self.fetch_html(url))
+            listings = self.parse(await self.fetch_html(url), query)
         except Exception as e:
             self.breaker.record_failure()
             result = self._result(query, url, started, error=str(e))
