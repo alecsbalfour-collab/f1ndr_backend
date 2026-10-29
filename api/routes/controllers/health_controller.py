@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Tuple
 
 from fastapi import APIRouter
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
 from api.config.settings_config import get_settings
@@ -26,6 +27,12 @@ from utils.response_builder import error_response, success_response
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["health"])
+
+
+@router.get("/metrics", include_in_schema=False)
+async def prometheus_metrics():
+    from api.observability.metrics import render_prometheus
+    return PlainTextResponse(render_prometheus(), media_type="text/plain; version=0.0.4; charset=utf-8")
 
 MONGO_PING_TIMEOUT_SECONDS = 2.0
 

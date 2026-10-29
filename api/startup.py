@@ -13,6 +13,11 @@ logger = logging.getLogger(__name__)
 
 
 async def on_startup(app: FastAPI) -> None:
+    from api.observability.logging import configure_logging
+    from api.observability.sentry import init_sentry
+
+    configure_logging()
+    init_sentry(get_settings())
     """Open the shared Mongo connection, hand it to every module, and start the scheduler."""
     if await connect_to_db(app):
         from dealr.db.client_db import attach_database

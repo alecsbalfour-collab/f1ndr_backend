@@ -99,6 +99,8 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
         request_id,
         exc_info=exc,
     )
+    from api.observability.sentry import capture
+    capture(exc, request_id=request_id)
     return error_response(
         message="Internal server error",
         status_code=500,

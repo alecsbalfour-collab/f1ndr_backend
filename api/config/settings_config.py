@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     # App Environment
     ENVIRONMENT: str = "development"
     LOG_LEVEL: str = "info"
+    LOG_FORMAT: str = "json"  # "json" or "text"
+    # Observability (optional)
+    SENTRY_DSN: Optional[str] = None
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.0
+    OTEL_EXPORTER_OTLP_ENDPOINT: Optional[str] = None
 
     # App Metadata
     APP_NAME: str = "f1ndr API"

@@ -94,7 +94,7 @@ Product shape: f1ndr is the main consumer app — scrape classifieds (Kijiji, Ma
 ### Session 3+ - Enterprise features (Tier 3, one session each)
 - [x] Pydantic request/response models instead of `Dict[str, Any]` bodies (`api/schemas/` exists, unused). `/health` still returns untyped data (waiting on the live/ready split).
 - [x] API versioning under `/api/v1`. Legacy unversioned aliases still mounted (deprecated); remove once unused.
-- [ ] Observability: structured JSON logs with request ID, Prometheus metrics, OpenTelemetry tracing, Sentry.
+- [x] Observability: structured JSON logs with request ID, Prometheus metrics, OpenTelemetry tracing, Sentry. api/observability/{logging,sentry,metrics}: ContextVar request_id/traceparent, JsonLogFormatter (LOG_FORMAT=json), Sentry on SENTRY_DSN (PII off), in-process Prometheus on GET /metrics (root, schema-hidden), timer middleware feeds counters.
 - [x] Auth maturity: refresh-token revocation via `jti`, roles/scopes, account lockout, email verification, audit log.
 - [ ] Redis + background work (one session, decided: ARQ on Redis, no leader lock). Scrapers and the scheduler currently run inside the API process, so with multiple workers or replicas scheduled jobs run twice and in-memory slowapi limits don't hold. One Redis instance covers all of it:
   - ARQ worker as a separate process/compose service; `trinn/utils/scheduler.py` loop and scraper jobs become ARQ functions + `cron_jobs`. API only enqueues. ARQ is asyncio-native, so it fits the async `run()` contract (Celery doesn't).
