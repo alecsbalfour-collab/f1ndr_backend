@@ -125,3 +125,11 @@ Provider accounts are owned by admin@triverdant.ca; secrets go in env/secret man
 - [ ] A3 MFA core: login returns `mfa_required` + short-lived `mfa_pending` token; TOTP (secret encrypted at rest, new key setting) + 10 hashed single-use recovery codes; per-token and per-user attempt limits; fresh login required to change MFA.
 - [ ] A4 Email OTP as an MFA method (weak while reset goes to the same inbox; not allowed as the only factor for dealr).
 - [ ] A5 Facebook (Graph `debug_token`; iOS Limited Login gives an OIDC token) + Twilio SMS OTP (country allowlist CA/US, Fraud Guard, never the only factor).
+
+## Frontend: Next.js (supersedes the FlutterFlow wiring)
+- API contract is unchanged — every route is typed in the OpenAPI spec (live `/openapi.json`; `openapi_f1ndr.json` in the repo is a stale snapshot). Generate the client from the spec rather than hand-writing calls; operation IDs are `<tag>_<function>`.
+- Envelope: `$.data` payload / `$.pagination` meta on `Page` responses; errors are `success:false` + `message` + `error_code`. `POST /f1ndr/search` returns `{results:[...]}` under `data` (unpaginated) — use `GET /listings/unified` (paginated, merges all stores) for list screens.
+- Auth: `POST /auth/login|register` -> TokenPair `{access_token (Bearer, 24h), refresh_token, user{user_id,email,name}}`. `POST /auth/refresh` rotates — overwrite both tokens every time; replaying an old refresh token revokes the session family. On 401: refresh, retry once, else to login.
+- CORS: `localhost:*` already allowed for dev. Add the prod frontend origin via `CORS_ORIGINS` on Render (or `api/config/cors_config.py`).
+- Test user on prod: `fftester@f1ndr.ca` (password in local notes, not git).
+- Known data gaps for the UI: scraped docs often have `price`/`price_text`/`image` null (esp. Kijiji); multi-vertical platforms stamp `category:"other"` even on cars (a `vehicles` filter drops most of Kijiji); titles carry double-escaped HTML entities. `platform` filter param on `/listings/unified` was requested for the platform chip row but not yet built.
