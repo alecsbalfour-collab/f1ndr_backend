@@ -5,6 +5,7 @@ Core logic for f1ndr.
 from f1ndr.config.config import get_f1ndr_config
 from f1ndr.data.data import serialize_listing
 from f1ndr.db.db import query_listings, save_listing
+from f1ndr.intelligence.market import estimate_market_price
 from f1ndr.utils.utils import (
     normalize_listing,
     decode_vin,

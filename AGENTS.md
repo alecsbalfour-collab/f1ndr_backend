@@ -106,15 +106,15 @@ Product shape: f1ndr is the main consumer app — scrape classifieds (Kijiji, Ma
 - [ ] Resilience: timeouts on all outbound calls, graceful shutdown draining scraper jobs.
 
 ### dealr: RVs & towables (needs the category/subcategory model)
-- [ ] R1 Vehicle-specific typed fields, validated per subcategory (discriminated on `subcategory` within `category=vehicles`): length, dry weight, GVWR, sleeps, slide-outs, hitch type, fresh/grey/black tank sizes; mileage, engine and chassis only for motorized units. Towables may have short/odd VINs (already allowed by `LooseVIN`). VIN decode gives the type/chassis only; floorplan details are entered manually.
-- [ ] R2 Search/filter by category/subcategory and RV attributes (f1ndr search, sellr listings, dealr inventory); regenerate the FlutterFlow client.
-- [ ] R3 Marketplace categories in listr and scrapers (Kijiji/Facebook/AutoTrader RV sections; add RVTrader as a platform).
+- [x] R1 Vehicle-specific typed fields, validated per subcategory (discriminated on `subcategory` within `category=vehicles`): length, dry weight, GVWR, sleeps, slide-outs, hitch type, fresh/grey/black tank sizes; mileage, engine and chassis only for motorized units. Towables may have short/odd VINs (already allowed by `LooseVIN`). VIN decode gives the type/chassis only; floorplan details are entered manually.
+- [x] R2 Search/filter by category/subcategory and RV attributes (f1ndr search, sellr listings, dealr inventory); regenerate the FlutterFlow client.
+- [x] R3 Marketplace categories in listr and scrapers (Kijiji/Facebook/AutoTrader RV sections; add RVTrader as a platform).
 
 ### Pricing (after R1: comps must match within a category)
-- [ ] P1 One pricing provider interface in `f1ndr/intelligence/market.py` replacing both `compute_market_value` stubs (both return `None` for now). dealr ingest and sellr auto-pricing use it.
-- [ ] P2 Local market comps: persist scraped listings with location + category, add a location to dealer accounts, match year/make/model/trim within a mileage band and radius; return median, p25/p75, comp count, confidence. Asking prices, not sold prices; check marketplace terms before commercial use.
-- [ ] P3 Book values behind config flags: Canadian Black Book for cars/trucks (confirm whether its specialty valuations cover RVs) and an RV guide (e.g. J.D. Power) for RVs. Needs commercial agreements (`docs/ACCOUNTS_SETUP.md`).
-- [ ] P4 dealr pricing panel endpoint: book values + local comps + suggested price range.
+- [x] P1 One pricing provider interface in `f1ndr/intelligence/market.py` replacing both `compute_market_value` stubs (both return `None` for now). dealr ingest and sellr auto-pricing use it.
+- [x] P2 Local market comps: persist scraped listings with location + category, add a location to dealer accounts, match year/make/model/trim within a mileage band and radius; return median, p25/p75, comp count, confidence. Asking prices, not sold prices; check marketplace terms before commercial use.
+- [x] P3 Book values behind config flags: Canadian Black Book for cars/trucks (confirm whether its specialty valuations cover RVs) and an RV guide (e.g. J.D. Power) for RVs. Needs commercial agreements (`docs/ACCOUNTS_SETUP.md`).
+- [x] P4 dealr pricing panel endpoint: book values + local comps + suggested price range.
 
 ### Auth expansion - social login + MFA (decided: FastAPI owns auth, not Firebase; one session each, in order)
 Decisions: provider sign-in is trusted (no extra MFA after social login). SMS via Twilio (prefer Twilio Verify). Clients: FlutterFlow app ("Custom Authentication", social buttons as custom actions, app stores the rotated refresh token), f1ndr.ca and dealrlink.com web apps.
