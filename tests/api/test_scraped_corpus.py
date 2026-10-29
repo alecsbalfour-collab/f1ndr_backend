@@ -586,3 +586,84 @@ def test_listings_equivalent_rules():
     assert not listings_equivalent(a, {**b, "category": "goods"})       # different vertical
     assert not listings_equivalent(a, {**b, "year": 2020})              # conflicting structured field
     assert not listings_equivalent(a, {**b, "title": "Snowboard bindings"})
+
+
+def test_region_url_generation():
+    from scrapers.craigslist_scraper import CraigslistScraper
+    from scrapers.kijiji_scraper import KijijiScraper
+    from scrapers.rentfaster_scraper import RentFasterScraper
+
+    k = KijijiScraper(region="edmonton")
+    assert "/b-cars-trucks/edmonton/c174l1700203" in k.build_url(None)
+    assert "/b-edmonton/civic/k0l1700203" in k.build_url("civic")
+    t = KijijiScraper(region="toronto")
+    assert "/b-cars-trucks/city-of-toronto/c174l1700273" in t.build_url(None)
+    assert CraigslistScraper(region="vancouver").build_url(None) == \
+        "https://vancouver.craigslist.org/search/sss"
+    rf = RentFasterScraper(region="calgary")
+    assert rf.build_url(None) == "https://www.rentfaster.ca/ab/calgary/rentals/"
+
+
+def test_platforms_for_region():
+    from scrapers.config.regions_config import normalize_region, platforms_for_region
+
+    assert "rentfaster" in platforms_for_region("calgary")
+    assert "rentfaster" not in platforms_for_region("toronto")
+    assert "usedca" not in platforms_for_region("toronto")
+    assert "usedca" in platforms_for_region("victoria")
+    assert normalize_region(" Red Deer ") == "red_deer"
+    with pytest.raises(ValueError):
+        normalize_region("atlantis")
+
+
+async def test_run_rejects_unsupported_or_unknown_region():
+    from scrapers.rentfaster_scraper import RentFasterScraper
+
+    r = await RentFasterScraper().run(region="vancouver")  # Alberta-only scraper
+    assert r["success"] is False and "not available" in r["error"]
+    r = await RentFasterScraper().run(region="atlantis")
+    assert r["success"] is False and "Unsupported region" in r["error"]
+
+
+def test_scrape_regions_endpoint(client):
+    resp = client.get(f"{API}/scrapers/regions")
+    assert resp.status_code == 200
+    regions = {r["slug"]: r for r in resp.json()["data"]}
+    assert "kijiji" in regions["calgary"]["platforms"]
+    assert "usedca" not in regions["toronto"]["platforms"]
+    assert regions["vancouver"]["province"] == "bc"
+
+
+async def test_scrape_search_passes_region(client, headers_for, monkeypatch):
+    from scrapers.config.regions_config import normalize_region
+
+    captured = {}
+
+    async def fake_run_all(query, platforms, config=None, region=None):
+        captured["region"] = normalize_region(region)
+        return {"query": query, "region": region, "platforms": [],
+                "total": 0, "failed": [], "results": {}}
+
+    monkeypatch.setattr("api.routes.scraper_routes.run_all", fake_run_all)
+    resp = client.post(f"{API}/scrapers/search", json={"query": "civic", "region": "edmonton"},
+                       headers=headers_for("admin"))
+    assert resp.status_code == 200 and captured["region"] == "edmonton"
+    resp = client.post(f"{API}/scrapers/search", json={"region": "atlantis"},
+                       headers=headers_for("admin"))
+    assert resp.status_code == 400
+
+
+async def test_scraped_region_persists_and_scopes_alerts(mailer):
+    from watchr.core import core as watchr_core
+
+    await watchr_core.create_alert({"name": "Edm", "query": "civic", "region": "edmonton", "user_id": "u-edm"})
+    await watchr_core.create_alert({"name": "Cal", "query": "civic", "region": "calgary", "user_id": "u-cal"})
+    [doc] = await save_scraped_listings(
+        [{"title": "Honda Civic", "price_value": 1.0, "url": EDMONTON_URL}],
+        platform="kijiji", region="edmonton",
+    )
+    assert doc["region"] == "edmonton"
+    assert await watchr_core.evaluate_listings([doc]) == 1
+    [m] = await watchr_core.matches_store.find({"user_id": "u-edm"})
+    assert m["listing_id"] == doc["id"]
+    assert await watchr_core.matches_store.find({"user_id": "u-cal"}) == []

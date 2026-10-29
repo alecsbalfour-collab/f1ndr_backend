@@ -33,6 +33,7 @@ PUBLIC_ROUTES = {
     ("POST", "/sellr/photo-upload/{token}"),
     ("GET", "/listr/platforms"),
     ("GET", "/scrapers/platforms"),
+    ("GET", "/scrapers/regions"),
     ("GET", "/listings/unified"),
     ("GET", "/listings/compare"),
     ("GET", "/listings/external"),

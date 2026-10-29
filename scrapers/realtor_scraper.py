@@ -11,8 +11,9 @@ from scrapers.base_scraper import BaseScraper
 class RealtorScraper(BaseScraper):
     source_name = "realtor"
     default_category = "real_estate"
-    base_url = "https://www.realtor.ca/ab/calgary/real-estate"
-    search_url = "https://www.realtor.ca/ab/{query}/real-estate"
+    base_url = "https://www.realtor.ca/{prov}/{city}/real-estate"
+    search_url = "https://www.realtor.ca/{prov}/{city}/real-estate"
+    query_is_city = True
     card_selector = "div.cardCon, [data-testid='listing-card']"
     link_selector = "a.blockLink, a.listingDetailsLink, a[href*='/real-estate/']"
     fields = {

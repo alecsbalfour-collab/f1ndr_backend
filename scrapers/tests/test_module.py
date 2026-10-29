@@ -15,7 +15,7 @@ def test_every_platform_has_a_unique_source_name():
 async def test_run_all_limits_concurrency_and_aggregates(monkeypatch):
     active = {"now": 0, "peak": 0}
 
-    async def fake_run(self, query=None):
+    async def fake_run(self, query=None, region=None):
         active["now"] += 1
         active["peak"] = max(active["peak"], active["now"])
         await asyncio.sleep(0.01)
@@ -46,3 +46,22 @@ def test_health_report_status_reflects_open_circuits():
     report = module.health_report()
     assert report["status"] == "degraded"
     assert report["platforms"]["ebay"]["circuit"]["state"] == "open"
+
+
+def test_platforms_for_region_gates_run_all(monkeypatch):
+    import asyncio
+    from scrapers import module
+
+    called = []
+
+    async def fake_run_scraper(platform, query=None, config=None, region=None):
+        called.append((platform, region))
+        return {"source": platform, "query": query, "region": region, "url": None,
+                "success": True, "results": [], "count": 0, "error": None,
+                "cached": False, "duration_ms": 0.0, "scraped_at": "x"}
+
+    monkeypatch.setattr(module, "run_scraper", fake_run_scraper)
+    out = asyncio.run(module.run_all(region="toronto"))
+    # Toronto has no rentfaster / usedca / neighbourhood.
+    assert not [p for p, _ in called if p in ("rentfaster", "usedca", "neighbourhood")]
+    assert out["region"] == "toronto" and all(r == "toronto" for _, r in called)

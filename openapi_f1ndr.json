@@ -5211,6 +5211,58 @@
         }
       }
     },
+    "/api/v1/scrapers/regions": {
+      "get": {
+        "tags": [
+          "scrapers"
+        ],
+        "summary": "List Scrape Regions",
+        "description": "Regions the frontend can offer; each lists the platforms that serve it.",
+        "operationId": "scrapers_list_scrape_regions",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_List_RegionInfo__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/scrapers/search": {
       "post": {
         "tags": [
@@ -6855,6 +6907,43 @@
           "message"
         ],
         "title": "Envelope[List[ExternalSearchLink]]"
+      },
+      "Envelope_List_RegionInfo__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RegionInfo"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "Envelope[List[RegionInfo]]"
       },
       "Envelope_List_str__": {
         "properties": {
@@ -10072,6 +10161,37 @@
         ],
         "title": "RefreshRequest"
       },
+      "RegionInfo": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "province": {
+            "type": "string",
+            "title": "Province"
+          },
+          "platforms": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Platforms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "label",
+          "province",
+          "platforms"
+        ],
+        "title": "RegionInfo"
+      },
       "RegisterRequest": {
         "properties": {
           "email": {
@@ -10377,6 +10497,18 @@
               }
             ],
             "title": "Platforms"
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region"
           }
         },
         "type": "object",
@@ -10398,6 +10530,17 @@
               }
             ],
             "title": "Query"
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region"
           },
           "url": {
             "anyOf": [
@@ -10474,6 +10617,17 @@
               }
             ],
             "title": "Query"
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region"
           },
           "platforms": {
             "items": {
@@ -10559,6 +10713,18 @@
               }
             ],
             "title": "Query"
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region"
           }
         },
         "type": "object",

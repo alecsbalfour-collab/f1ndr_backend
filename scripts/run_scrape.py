@@ -33,6 +33,7 @@ async def main() -> int:
     parser.add_argument("--platform", required=True,
                         choices=sorted(SCRAPER_CLASSES) + ["all"])
     parser.add_argument("--query", default=None)
+    parser.add_argument("--region", default="calgary")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO,
@@ -50,7 +51,7 @@ async def main() -> int:
         platforms = list(SCRAPER_CLASSES) if args.platform == "all" else [args.platform]
         failed = 0
         for name in platforms:
-            result = await run_scraper(name, args.query or None)
+            result = await run_scraper(name, args.query or None, region=args.region)
             ok = result.get("success", False)
             failed += 0 if ok else 1
             print(f"{name}: success={ok} count={result.get('count', 0)} "

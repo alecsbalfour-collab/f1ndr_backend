@@ -9,8 +9,8 @@ from scrapers.base_scraper import BaseScraper
 
 class LocantoScraper(BaseScraper):
     source_name = "locanto"
-    base_url = "https://calgary.locanto.ca/Cars/201/"
-    search_url = "https://calgary.locanto.ca/q/?query={query}"
+    base_url = "https://{sub}.locanto.ca/Cars/201/"
+    search_url = "https://{sub}.locanto.ca/q/?query={query}"
     card_selector = "article.posting_listing, div.resultRow, li.bp_ad"
     link_selector = "a.posting_listing__title, a.bp_ad__link, a[href*='/ID_']"
     fields = {

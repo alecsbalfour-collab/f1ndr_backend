@@ -9,8 +9,8 @@ from scrapers.base_scraper import BaseScraper
 
 class KijijiScraper(BaseScraper):
     source_name = "kijiji"
-    base_url = "https://www.kijiji.ca/b-cars-trucks/calgary/c174l1700199"
-    search_url = "https://www.kijiji.ca/b-calgary/{query}/k0l1700199"
+    base_url = "https://www.kijiji.ca/b-cars-trucks/{city}/c174{loc}"
+    search_url = "https://www.kijiji.ca/b-{city}/{query}/k0{loc}"
     card_selector = "[data-testid='listing-card'], div.search-item"
     link_selector = "a[data-testid='listing-link'], a.title, a[href*='/v-']"
     fields = {

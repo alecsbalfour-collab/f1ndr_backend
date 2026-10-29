@@ -10,8 +10,9 @@ from scrapers.base_scraper import BaseScraper
 class RentalsScraper(BaseScraper):
     source_name = "rentals_ca"
     default_category = "real_estate"
-    base_url = "https://rentals.ca/calgary"
-    search_url = "https://rentals.ca/{query}"
+    base_url = "https://rentals.ca/{city}"
+    search_url = "https://rentals.ca/{city}"
+    query_is_city = True
     card_selector = "div.listing-card, article.listing-card"
     link_selector = "a.listing-card__details-link, a[href*='rentals.ca/'], a[href^='/']"
     fields = {

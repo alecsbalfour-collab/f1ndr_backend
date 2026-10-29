@@ -9,6 +9,7 @@ from typing import Any, Dict, Iterable, Optional, Type
 
 from scrapers.autotrader_scraper import AutotraderScraper
 from scrapers.base_scraper import BaseScraper
+from scrapers.config.regions_config import normalize_region, platforms_for_region
 from scrapers.config.settings_config import ScraperConfig
 from scrapers.core.metrics_core import metrics_registry
 from scrapers.core.resilience_core import breaker_registry
@@ -55,29 +56,34 @@ def _validate_platforms(platforms: Iterable[str]) -> list[str]:
 
 
 async def run_scraper(
-    platform: str, query: Optional[str] = None, config: Optional[ScraperConfig] = None
+    platform: str, query: Optional[str] = None, config: Optional[ScraperConfig] = None,
+    region: Optional[str] = None,
 ) -> Dict[str, Any]:
     _validate_platforms([platform])
-    return await SCRAPER_CLASSES[platform](config).run(query)
+    return await SCRAPER_CLASSES[platform](config).run(query, region=region)
 
 
 async def run_all(
     query: Optional[str] = None,
     platforms: Optional[Iterable[str]] = None,
     config: Optional[ScraperConfig] = None,
+    region: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Run the given platforms (default: all), at most `max_concurrency` browsers at once."""
+    """Run the given platforms (default: all available in the region), at most
+    `max_concurrency` browsers at once."""
     config = config or ScraperConfig.from_env()
-    names = _validate_platforms(platforms or SCRAPER_CLASSES)
+    active_region = normalize_region(region)
+    names = _validate_platforms(platforms or platforms_for_region(active_region))
     semaphore = asyncio.Semaphore(config.max_concurrency)
 
     async def _bounded(name: str) -> Dict[str, Any]:
         async with semaphore:
-            return await run_scraper(name, query, config)
+            return await run_scraper(name, query, config, region=active_region)
 
     results = await asyncio.gather(*(_bounded(name) for name in names))
     return {
         "query": query,
+        "region": active_region,
         "platforms": names,
         "total": sum(result["count"] for result in results),
         "failed": [name for name, result in zip(names, results) if not result["success"]],

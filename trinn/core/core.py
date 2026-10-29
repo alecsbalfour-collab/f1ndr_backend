@@ -72,7 +72,7 @@ async def _execute_scrape_task(data: Dict[str, Any], config) -> Dict[str, Any]:
         raise ValidationError(f"Unsupported scraper platform: {platform}")
 
     # Retries, backoff and circuit breaking are handled inside the scraper.
-    result = await run_scraper(platform, data.get("query"))
+    result = await run_scraper(platform, data.get("query"), region=data.get("region"))
     if not result["success"]:
         raise TrinnError(f"Scraper task failed for {platform}: {result['error']}")
 

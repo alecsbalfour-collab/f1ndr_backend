@@ -19,6 +19,7 @@ class ScrapeTask(_Task):
     task: Literal["scrape"]
     platform: ScraperPlatform
     query: Optional[str] = Field(None, max_length=MAX_QUERY_LENGTH)
+    region: Optional[str] = Field(None, max_length=50)
 
 
 class VinTask(_Task):

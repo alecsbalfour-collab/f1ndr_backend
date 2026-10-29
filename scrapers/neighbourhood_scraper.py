@@ -1,27 +1,18 @@
 """
 Neighbourhood classifieds scraper: city-specific Used.ca network sites.
-The query is the city name ("calgary" or "edmonton"), defaulting to Calgary.
+The region picks the site (regions_config _USED_CITIES); a city-name query is
+still accepted for backward compatibility via query_is_city.
 """
 
 from typing import Any, Dict, Optional
 
 from scrapers.used_scraper import UsedNetworkScraper
 
-CITY_URLS = {
-    "calgary": "https://www.usedcalgary.com/classifieds/cars",
-    "edmonton": "https://www.usededmonton.com/classifieds/cars",
-}
-
 
 class NeighbourhoodScraper(UsedNetworkScraper):
     source_name = "neighbourhood_classifieds"
-    base_url = CITY_URLS["calgary"]
-
-    def build_url(self, query: Optional[str]) -> str:
-        city = (query or "calgary").lower()
-        if city not in CITY_URLS:
-            raise ValueError(f"Unsupported city: {query}. Supported: {', '.join(CITY_URLS)}")
-        return CITY_URLS[city]
+    base_url = "https://www.{host}/classifieds/cars"
+    query_is_city = True
 
 
 async def run(query: Optional[str] = None) -> Dict[str, Any]:

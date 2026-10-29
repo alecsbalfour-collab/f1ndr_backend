@@ -10,8 +10,10 @@ from fastapi import APIRouter, Depends
 
 from api.dependencies.auth import require_scopes
 from api.schemas.common import Envelope, ok
-from api.schemas.scraper_schemas import ScrapeRequest, ScrapeSummary
+from api.schemas.scraper_schemas import RegionInfo, ScrapeRequest, ScrapeSummary
+from scrapers.config.regions_config import list_regions
 from scrapers.module import SCRAPER_CLASSES, run_all
+from utils.response_builder import error_response
 
 
 logger = logging.getLogger(__name__)
@@ -24,9 +26,21 @@ async def list_platforms():
     return ok(list(SCRAPER_CLASSES), "Supported scraper platforms")
 
 
+@router.get("/regions", response_model=Envelope[List[RegionInfo]])
+async def list_scrape_regions():
+    """Regions the frontend can offer; each lists the platforms that serve it."""
+    return ok(list_regions(), "Supported scrape regions")
+
+
+# Admin-only: each call launches headless browsers against third-party sites.
+
+
 # Admin-only: each call launches headless browsers against third-party sites.
 @router.post("/search", response_model=Envelope[ScrapeSummary], dependencies=[Depends(require_scopes("tasks:admin"))])
 async def scrapers_search(request: ScrapeRequest):
-    data = await run_all(request.query, request.platforms)
+    try:
+        data = await run_all(request.query, request.platforms, region=request.region)
+    except ValueError as e:
+        return error_response(message=str(e), status_code=400, error_code="INVALID_REGION")
     logger.info("Scrape '%s': %d listings, failed=%s", request.query, data["total"], data["failed"])
     return ok(data, f"Found {data['total']} listings")

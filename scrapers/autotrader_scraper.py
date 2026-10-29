@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional
 
 from scrapers.base_scraper import BaseScraper
 
-_SEARCH = "https://www.autotrader.ca/cars/ab/calgary/?rcp=100&srt=35&prx=100&prv=Alberta&loc=Calgary%2C%20AB"
+_SEARCH = "https://www.autotrader.ca/cars/{prov}/{city}/?rcp=100&srt=35&prx=100&prv={prv}&loc={loc}"
 
 
 class AutotraderScraper(BaseScraper):
