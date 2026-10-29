@@ -16,6 +16,7 @@ from api.schemas.list_schemas import (
     Subcategory,
     VehicleOut,
 )
+from dealr.db.inventory_repo import inventory_store
 from f1ndr.data.external_search import external_search_links
 from f1ndr.db.db import listings_store as f1ndr_store
 from f1ndr.utils.utils import group_equivalent_listings
@@ -84,8 +85,15 @@ async def _merged_listing_docs(category=None, subcategory=None, region=None, pla
     query = {k: v for k, v in {"category": category, "subcategory": subcategory, "region": region}.items() if v}
     platforms = _PLATFORM_ALIASES.get(platform, {platform}) if platform else None
     seen, docs = set(), []
-    for store in (sellr_store, listr_store, f1ndr_store):
+    for store in (sellr_store, listr_store, f1ndr_store, inventory_store):
         for doc in await store.find(query, limit=10_000):
+            if store is inventory_store:
+                if (doc.get("status") or "").lower() in _DEALR_HIDDEN_STATUSES:
+                    continue
+                doc = dict(doc)
+                doc["platform"] = doc.get("platform") or "dealr"
+                if not doc.get("title"):
+                    doc["title"] = doc.get("name")
             if platforms and doc.get("platform") not in platforms:
                 continue
             key = doc.get("id") or doc.get("key") or id(doc)
@@ -148,7 +156,12 @@ async def get_external_search_links(
 # Platform spellings differ between listr pushes and scraper source names.
 _PLATFORM_ALIASES = {
     "facebook": {"facebook", "facebook_marketplace"},
+    "dealr": {"dealr"},
 }
+
+
+# Inventory rows in these states never surface in consumer discovery.
+_DEALR_HIDDEN_STATUSES = {"sold", "archived", "draft"}
 
 
 async def _raw_platform_listings(platform: str, page: int, page_size: int) -> dict:

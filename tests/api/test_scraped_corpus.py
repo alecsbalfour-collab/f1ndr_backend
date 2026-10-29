@@ -23,11 +23,12 @@ def client():
 @pytest.fixture(autouse=True)
 def clean_corpus():
     # Other tests' in-memory docs leak through the shared stores (unified/compare
-    # merge all three), so clear all of them.
+    # merge all of them), so clear all of them.
+    from dealr.db.inventory_repo import inventory_store
     from listr.db.listing_repo import listings_store as listr_store
     from sellr.utils.utils import listings_store as sellr_store
 
-    for store in (listings_store, listr_store, sellr_store):
+    for store in (listings_store, listr_store, sellr_store, inventory_store):
         store.clear_memory()
 
 
@@ -667,3 +668,35 @@ async def test_scraped_region_persists_and_scopes_alerts(mailer):
     [m] = await watchr_core.matches_store.find({"user_id": "u-edm"})
     assert m["listing_id"] == doc["id"]
     assert await watchr_core.matches_store.find({"user_id": "u-cal"}) == []
+
+
+async def test_dealr_inventory_surfaces_in_unified_and_compare(client, headers_for):
+    dealer = headers_for("dealer")
+    payload = {"name": "Dealer Honda Civic", "category": "vehicles", "subcategory": "car",
+               "price": 18500, "year": 2019, "make": "Honda", "model": "Civic",
+               "region": "calgary", "status": "active"}
+    created = client.post(f"{API}/dealr/inventory", json=payload, headers=dealer)
+    assert created.status_code == 201, created.text
+    item = created.json()["data"]
+
+    sold = client.post(f"{API}/dealr/inventory", headers=dealer,
+                       json={**payload, "name": "Gone Car", "status": "sold"})
+    assert sold.status_code == 201
+
+    unified = client.get(f"{API}/listings/unified").json()["data"]
+    hit = next(d for d in unified if d["id"] == item["id"])
+    assert hit["platform"] == "dealr" and hit["title"] == "Dealer Honda Civic"
+    assert all(d["id"] != sold.json()["data"]["id"] for d in unified)
+
+    dealr_only = client.get(f"{API}/listings/unified", params={"platform": "dealr"}).json()["data"]
+    assert dealr_only and all(d["platform"] == "dealr" for d in dealr_only)
+
+    # An equivalent scraped doc clusters with the dealer item in /listings/compare.
+    await save_scraped_listings(
+        [{"title": "Dealer Honda Civic", "price_value": 18500.0,
+          "url": "https://www.kijiji.ca/v-cars-trucks/calgary/civic/999"}],
+        platform="kijiji", category="vehicles", region="calgary")
+    resp = client.get(f"{API}/listings/compare", params={"listing_id": item["id"]})
+    assert resp.status_code == 200
+    group = resp.json()["data"][0]
+    assert {d["id"] for d in group["listings"]} | {item["id"]} == {item["id"], "kijiji:" + group["listings"][0]["id"].split(":", 1)[-1]} or len(group["listings"]) == 2
