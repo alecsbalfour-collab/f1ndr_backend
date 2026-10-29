@@ -22,6 +22,7 @@ from bs4 import BeautifulSoup, Tag
 from playwright.async_api import async_playwright
 
 from f1ndr.db.db import save_scraped_listings
+from scrapers.config.regions_config import DEFAULT_REGION, REGIONS, get_region_info, normalize_region
 from scrapers.config.settings_config import ScraperConfig
 from scrapers.core.metrics_core import metrics_registry
 from scrapers.core.normalization_core import parse_price
@@ -70,13 +71,17 @@ class BaseScraper:
     link_selector: str = "a[href]"
     fields: Dict[str, str] = {}
     slug_query: bool = False
-    # Corpus metadata stamped on persisted listings. Region is the market the
-    # scraper targets; URLs are Calgary-baked today (multi-region is a roadmap item).
-    region: str = "calgary"
+    # Corpus metadata stamped on persisted listings. `region` is the market the
+    # scraper targets; URLs are built from regions_config templates.
+    region: str = DEFAULT_REGION
     default_category: str = "other"
+    # City-scraped sites (realtor/rentals/zillow/neighbourhood): a query that is a
+    # region name is treated as the target region for backward compatibility.
+    query_is_city: bool = False
 
-    def __init__(self, config: Optional[ScraperConfig] = None):
+    def __init__(self, config: Optional[ScraperConfig] = None, region: Optional[str] = None):
         self.config = config or ScraperConfig.from_env()
+        self._active_region = region or self.region
         self.breaker = breaker_registry.get(
             self.source_name,
             self.config.breaker_failure_threshold,
@@ -84,13 +89,19 @@ class BaseScraper:
         )
         self.metrics = metrics_registry.get(self.source_name)
 
+    def region_params(self) -> Dict[str, str]:
+        """URL template kwargs for the active region from the platform map."""
+        info = get_region_info(self._active_region)
+        return info["platforms"].get(self.source_name) or {}
+
     def build_url(self, query: Optional[str]) -> str:
         """Search URL for `query`, or the default browse page when there is none.
         Platforms that take the query as a path segment set slug_query=True."""
+        params = self.region_params()
         if not (query and self.search_url):
-            return self.base_url
+            return self.base_url.format(**params)
         encoded = quote(query.lower().replace(" ", "-")) if self.slug_query else quote_plus(query)
-        return self.search_url.format(query=encoded)
+        return self.search_url.format(query=encoded, **params)
 
     def absolute_url(self, href: Optional[str]) -> Optional[str]:
         return urljoin(self.base_url, href) if href else None
@@ -218,11 +229,13 @@ class BaseScraper:
         started: float,
         listings: Optional[List[Dict[str, Any]]] = None,
         error: Optional[str] = None,
+        region: Optional[str] = None,
     ) -> Dict[str, Any]:
         listings = listings or []
         return {
             "source": self.source_name,
             "query": query,
+            "region": region or self._active_region,
             "url": url,
             "success": error is None,
             "results": listings,
@@ -233,15 +246,26 @@ class BaseScraper:
             "scraped_at": datetime.now(timezone.utc).isoformat(),
         }
 
-    async def run(self, query: Optional[str] = None) -> Dict[str, Any]:
+    async def run(self, query: Optional[str] = None, region: Optional[str] = None) -> Dict[str, Any]:
         started = time.perf_counter()
+        # Backward compat: on city-scraped sites a city-name query is the region.
+        if region is None and self.query_is_city and query:
+            try:
+                region = normalize_region(query)
+                query = None
+            except ValueError:
+                pass
         try:
+            active_region = normalize_region(region or self._active_region)
+            if self.source_name not in get_region_info(active_region)["platforms"]:
+                raise ValueError(f"{self.source_name} is not available in region '{active_region}'")
+            self._active_region = active_region
             query = sanitize_query(query)
             url = self.build_url(query)
         except ValueError as e:
-            return self._result(None, None, started, error=str(e))
+            return self._result(query, None, started, error=str(e), region=region)
 
-        cache_key = f"{self.source_name}:{url}"
+        cache_key = f"{self.source_name}:{active_region}:{url}"
         if self.config.cache_ttl_seconds:
             cached = await cache_get(cache_key)
             if cached is not None:
@@ -278,7 +302,7 @@ class BaseScraper:
                     listings,
                     platform=self.source_name,
                     category=self.default_category,
-                    region=self.region,
+                    region=active_region,
                 )
                 try:
                     from watchr.core.core import evaluate_listings
