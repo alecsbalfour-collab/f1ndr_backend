@@ -469,7 +469,8 @@ def test_classify_listing_by_url():
     craigslist = CraigslistScraper()
     assert craigslist.classify_listing({"url": "https://calgary.craigslist.org/cto/d/x/1.html"}) == "vehicles"
     assert craigslist.classify_listing({"url": "https://calgary.craigslist.org/apa/d/x/2.html"}) == "real_estate"
-    assert craigslist.classify_listing({"url": "https://calgary.craigslist.org/fuo/d/x/3.html"}) == "other"
+    assert craigslist.classify_listing({"url": "https://calgary.craigslist.org/fuo/d/x/3.html"}) == "goods"
+    assert craigslist.classify_listing({"url": "https://calgary.craigslist.org/vgm/d/x/9.html"}) == "other"
 
 
 def test_parse_stamps_inferred_category():
@@ -700,3 +701,45 @@ async def test_dealr_inventory_surfaces_in_unified_and_compare(client, headers_f
     assert resp.status_code == 200
     group = resp.json()["data"][0]
     assert {d["id"] for d in group["listings"]} | {item["id"]} == {item["id"], "kijiji:" + group["listings"][0]["id"].split(":", 1)[-1]} or len(group["listings"]) == 2
+
+
+def test_classify_new_verticals():
+    from scrapers.craigslist_scraper import CraigslistScraper
+    from scrapers.kijiji_scraper import KijijiScraper
+
+    k = KijijiScraper()
+    assert k.classify_listing({"url": "https://www.kijiji.ca/v-power-tool/calgary/drill/1"}) == "goods"
+    assert k.classify_listing({"url": "https://www.kijiji.ca/v-furniture/calgary/couch/2"}) == "goods"
+    assert k.classify_listing({"url": "https://www.kijiji.ca/v-jobs/calgary/cook/3"}) == "jobs"
+    assert k.classify_listing({"url": "https://www.kijiji.ca/v-services/calgary/lawn/4"}) == "services"
+    assert k.classify_listing({"url": "https://www.kijiji.ca/v-pets/calgary/pups/5"}) == "pets"
+    assert k.classify_listing({"url": "https://www.kijiji.ca/v-community/calgary/event/6"}) == "community"
+    assert k.classify_listing({"url": "https://www.kijiji.ca/b-buy-sell/calgary/x/7"}) == "goods"
+
+    c = CraigslistScraper()
+    assert c.classify_listing({"url": "https://calgary.craigslist.org/tls/d/drill/1.html"}) == "goods"
+    assert c.classify_listing({"url": "https://calgary.craigslist.org/ele/d/tv/2.html"}) == "goods"
+    assert c.classify_listing({"url": "https://calgary.craigslist.org/jjj/d/cook/3.html"}) == "jobs"
+    assert c.classify_listing({"url": "https://calgary.craigslist.org/sks/d/lawn/4.html"}) == "services"
+    assert c.classify_listing({"url": "https://calgary.craigslist.org/ccc/d/event/5.html"}) == "community"
+
+    # eBay item pages classify as goods (no vehicle/estate hint matched).
+    from scrapers.ebay_scraper import EbayScraper
+    assert EbayScraper().classify_listing({"url": "https://www.ebay.ca/itm/123456"}) == "goods"
+
+
+async def test_refresh_search_endpoint(client, headers_for, monkeypatch):
+    from api.routes.controllers import list_controller as lc
+
+    async def fake_run_all(query=None, platforms=None, config=None, region=None):
+        return {"query": query, "region": region, "platforms": platforms or [],
+                "total": 3, "failed": [], "results": {}}
+
+    monkeypatch.setattr(lc, "run_all", fake_run_all)
+    h = headers_for("user")
+    r = client.post(f"{API}/listings/refresh-search",
+                    json={"query": "tools", "region": "calgary"}, headers=h)
+    assert r.status_code == 200, r.text
+    data = r.json()["data"]
+    assert data["total"] == 3 and data["platforms"] == ["kijiji", "craigslist", "ebay", "used"]
+    assert client.post(f"{API}/listings/refresh-search", json={"query": "tools"}).status_code == 401

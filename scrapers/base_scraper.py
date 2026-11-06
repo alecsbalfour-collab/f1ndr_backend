@@ -51,6 +51,20 @@ _URL_CATEGORY_HINTS = (
     ("/v-motorhome", "vehicles"),
     ("/rvs/", "vehicles"),
     ("rvtrader.com", "vehicles"),
+    # General buy-and-sell verticals.
+    ("/v-tool", "goods"), ("/v-power-tool", "goods"), ("/v-hand-tool", "goods"),
+    ("/v-buy-sell", "goods"), ("/v-electronics", "goods"), ("/v-furniture", "goods"),
+    ("/v-home-", "goods"), ("/v-sporting-goods", "goods"), ("/v-bikes", "goods"),
+    ("/v-musical-instruments", "goods"), ("/v-toys-games", "goods"),
+    ("/b-buy-sell", "goods"), ("/b-tool", "goods"),
+    ("/tls/", "goods"), ("/ele/", "goods"), ("/fuo/", "goods"), ("/fud/", "goods"),
+    ("/for/", "goods"), ("/spo/", "goods"), ("/msg/", "goods"), ("/grd/", "goods"),
+    ("/app/", "goods"), ("/itm/", "goods"),
+    # Other classifieds verticals.
+    ("/v-services", "services"), ("/b-services", "services"), ("/sks/", "services"),
+    ("/v-jobs", "jobs"), ("/b-jobs", "jobs"), ("/jjj/", "jobs"),
+    ("/v-pets", "pets"), ("/b-pets", "pets"),
+    ("/v-community", "community"), ("/b-community", "community"), ("/ccc/", "community"),
 )
 
 # Subcategory inference from listing URL/title — RV kinds only for now.
@@ -144,11 +158,16 @@ class BaseScraper:
         return listing
 
     def classify_listing(self, listing: Dict[str, Any], query: Optional[str] = None) -> str:
-        """Infer a listing's category from URL-path hints (the listing's own URL
-        and the page being scraped); falls back to the scraper's default_category."""
-        blob = " ".join(p for p in (listing.get("url"), self.build_url(query)) if p)
+        """Infer a listing's category from URL-path hints. The listing's own URL
+        wins over the browse/search page URL (e.g. a Kijiji tool ad scraped from
+        the cars&trucks browse page is still 'goods')."""
+        url = listing.get("url") or ""
         for pattern, category in _URL_CATEGORY_HINTS:
-            if pattern in blob:
+            if pattern in url:
+                return category
+        browse = self.build_url(query)
+        for pattern, category in _URL_CATEGORY_HINTS:
+            if pattern in browse:
                 return category
         return self.default_category
 

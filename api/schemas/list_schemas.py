@@ -148,3 +148,8 @@ class ListrResult(BaseModel):
 class PlatformList(BaseModel):
     platforms: List[str]
     count: int
+
+
+class RefreshSearchRequest(BaseModel):
+    query: str = Field(..., min_length=1, max_length=200)
+    region: Optional[str] = Field(None, max_length=50)

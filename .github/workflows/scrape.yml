@@ -28,6 +28,10 @@ on:
         description: "Region slug (e.g. calgary, edmonton, toronto)"
         required: false
         default: "calgary"
+      seed_queries:
+        description: "General-classifieds keywords for the post-browse seed pass"
+        required: false
+        default: "tools,electronics,furniture,appliances,bikes"
 
 permissions: {}
 
@@ -75,4 +79,5 @@ jobs:
           PLATFORM: ${{ inputs.platform || 'all' }}
           QUERY: ${{ inputs.query }}
           REGION: ${{ inputs.region || 'calgary' }}
-        run: python scripts/run_scrape.py --platform "$PLATFORM" --query "$QUERY" --region "$REGION"
+          SEED_QUERIES: ${{ inputs.seed_queries || 'tools,electronics,furniture,appliances,bikes' }}
+        run: python scripts/run_scrape.py --platform "$PLATFORM" --query "$QUERY" --region "$REGION" --seed-queries "$SEED_QUERIES"

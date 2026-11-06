@@ -12,6 +12,16 @@ def client():
     return TestClient(app)
 
 
+@pytest.fixture(autouse=True)
+def _force_fallback(monkeypatch):
+    """Route responses through the in-process fallback regardless of whether a
+    local SquelchGrip engine happens to be running."""
+    async def _offline(*args, **kwargs):
+        return None
+    monkeypatch.setattr("api.routes.voice_routes._remote", _offline)
+    monkeypatch.setattr("api.routes.voice_routes._ROOMS", {})
+
+
 def test_voice_requires_auth(client):
     assert client.post(f"{API}/rooms", json={"room_id": "r1", "initial_topic": "t"}).status_code == 401
     assert client.post(f"{API}/rooms/r1/turns", json={"raw_utterance": "hi"}).status_code == 401

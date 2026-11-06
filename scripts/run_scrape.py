@@ -17,6 +17,7 @@ is unreachable (nothing would persist anyway).
 import argparse
 import asyncio
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -34,6 +35,12 @@ async def main() -> int:
                         choices=sorted(SCRAPER_CLASSES) + ["all"])
     parser.add_argument("--query", default=None)
     parser.add_argument("--region", default="calgary")
+    parser.add_argument(
+        "--seed-queries",
+        default=os.getenv("SCRAPE_SEED_QUERIES", "tools,electronics,furniture,appliances,bikes"),
+        help="Comma-separated general-classifieds keywords scraped after the browse pass "
+             "when --platform all and no --query (keeps the goods corpus populated)",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO,
@@ -56,6 +63,16 @@ async def main() -> int:
             failed += 0 if ok else 1
             print(f"{name}: success={ok} count={result.get('count', 0)} "
                   f"error={result.get('error')}")
+
+        # Multi-vertical sweep: browse defaults only cover vehicles/real_estate on
+        # several platforms, so seed the general classifieds verticals too.
+        if args.platform == "all" and not args.query:
+            seeds = [q.strip() for q in args.seed_queries.split(",") if q.strip()]
+            for query in seeds:
+                for name in ("kijiji", "craigslist", "ebay", "used", "locanto"):
+                    result = await run_scraper(name, query, region=args.region)
+                    print(f"{name}[seed:{query}]: success={result.get('success')} "
+                          f"count={result.get('count', 0)}")
         try:
             print(f"watchr notification retry: {await retry_pending_notifications()}")
         except Exception:

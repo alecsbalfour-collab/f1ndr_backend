@@ -5,14 +5,16 @@ DICT-aligned list controller with FlutterFlow compatibility and enterprise featu
 
 import logging
 from typing import Dict, Any, Optional, List
-from fastapi import APIRouter, Query
-from api.schemas.common import Envelope, Page, ok, paged
+from fastapi import APIRouter, Depends, Query, Request
+from api.dependencies.auth import require_user
+from api.schemas.common import Envelope, Page, error_responses, ok, paged
 from api.schemas.list_schemas import (
     Category,
     ComparisonGroup,
     ExternalSearchLink,
     OptCategory,
     OptSubcategory,
+    RefreshSearchRequest,
     Subcategory,
     VehicleOut,
 )
@@ -20,6 +22,11 @@ from dealr.db.inventory_repo import inventory_store
 from f1ndr.data.external_search import external_search_links
 from f1ndr.db.db import listings_store as f1ndr_store
 from f1ndr.utils.utils import group_equivalent_listings, rv_matches
+from api.schemas.scraper_schemas import ScrapeSummary
+from api.security.rate_limiter import limiter
+from scrapers.module import run_all
+from trinn.config.config import get_trinn_config
+from utils.response_builder import error_response
 from listr.db.listing_repo import listings_store as listr_store
 from sellr.utils.utils import listings_store as sellr_store
 
@@ -217,3 +224,25 @@ async def get_raw_craigslist_listings(
     """Get raw Craigslist listings with FlutterFlow-compatible pagination."""
     logger.info(f"Getting raw Craigslist listings - page: {page}")
     return await _raw_platform_listings("craigslist", page, page_size)
+
+
+@router.post("/refresh-search", response_model=Envelope[ScrapeSummary],
+             responses=error_responses(401, 429))
+@limiter.limit("5/minute")
+async def refresh_search(request: Request, body: RefreshSearchRequest,
+                         claims: Dict[str, Any] = Depends(require_user)):
+    """Pull fresh listings for a keyword from the general-classifieds platforms.
+
+    On hosts too small for Chromium (the 512MB Render service sets
+    ENABLE_SCRAPER_TASKS=false) returns an empty summary rather than failing.
+    """
+    if not get_trinn_config()["enable_scraper_tasks"]:
+        return ok({"query": body.query, "region": body.region, "platforms": [],
+                   "total": 0, "failed": [], "results": {}},
+                  "Scraping is disabled on this service")
+    data = await run_all(
+        query=body.query,
+        platforms=["kijiji", "craigslist", "ebay", "used"],
+        region=body.region,
+    )
+    return ok(data, f"Refreshed {data['total']} listings")
