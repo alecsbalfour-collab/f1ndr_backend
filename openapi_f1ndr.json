@@ -6339,6 +6339,266 @@
         ]
       }
     },
+    "/api/v1/voice/rooms": {
+      "post": {
+        "tags": [
+          "voice"
+        ],
+        "summary": "Create Voice Room",
+        "operationId": "voice_create_voice_room",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceRoomCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_VoiceRoomOut_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/voice/rooms/{room_id}/turns": {
+      "post": {
+        "tags": [
+          "voice"
+        ],
+        "summary": "Send Voice Turn",
+        "operationId": "voice_send_voice_turn",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "room_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Room Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceTurnRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_VoiceTurnOut_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/voice/rooms/{room_id}/prompt": {
+      "get": {
+        "tags": [
+          "voice"
+        ],
+        "summary": "Get Voice Prompt",
+        "operationId": "voice_get_voice_prompt",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "room_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Room Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_VoicePromptOut_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/version/": {
       "get": {
         "tags": [
@@ -9355,6 +9615,105 @@
           "message"
         ],
         "title": "Envelope[VinDecodeResult]"
+      },
+      "Envelope_VoicePromptOut_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoicePromptOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "Envelope[VoicePromptOut]"
+      },
+      "Envelope_VoiceRoomOut_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoiceRoomOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "Envelope[VoiceRoomOut]"
+      },
+      "Envelope_VoiceTurnOut_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoiceTurnOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "Envelope[VoiceTurnOut]"
       },
       "ErrorEnvelope": {
         "properties": {
@@ -16415,6 +16774,224 @@
           "vin"
         ],
         "title": "VinTask"
+      },
+      "VoicePromptOut": {
+        "properties": {
+          "room_id": {
+            "type": "string",
+            "title": "Room Id"
+          },
+          "active_node_id": {
+            "type": "string",
+            "title": "Active Node Id"
+          },
+          "active_topic": {
+            "type": "string",
+            "title": "Active Topic"
+          },
+          "lineage_breadcrumbs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Lineage Breadcrumbs"
+          },
+          "recent_utterances": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Recent Utterances"
+          },
+          "unresolved_tangent_topics": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unresolved Tangent Topics"
+          },
+          "system_prompt_markdown": {
+            "type": "string",
+            "title": "System Prompt Markdown"
+          }
+        },
+        "type": "object",
+        "required": [
+          "room_id",
+          "active_node_id",
+          "active_topic",
+          "lineage_breadcrumbs",
+          "recent_utterances",
+          "unresolved_tangent_topics",
+          "system_prompt_markdown"
+        ],
+        "title": "VoicePromptOut"
+      },
+      "VoiceRoomCreateRequest": {
+        "properties": {
+          "room_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Room Id"
+          },
+          "initial_topic": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Initial Topic"
+          },
+          "domain": {
+            "type": "string",
+            "enum": [
+              "f1ndr",
+              "dealr"
+            ],
+            "title": "Domain",
+            "default": "f1ndr"
+          }
+        },
+        "type": "object",
+        "required": [
+          "room_id",
+          "initial_topic"
+        ],
+        "title": "VoiceRoomCreateRequest"
+      },
+      "VoiceRoomOut": {
+        "properties": {
+          "room_id": {
+            "type": "string",
+            "title": "Room Id"
+          },
+          "root_node_id": {
+            "type": "string",
+            "title": "Root Node Id"
+          },
+          "current_node_id": {
+            "type": "string",
+            "title": "Current Node Id"
+          },
+          "is_ai_speaking": {
+            "type": "boolean",
+            "title": "Is Ai Speaking"
+          },
+          "lexicon_pack_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Lexicon Pack Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "room_id",
+          "root_node_id",
+          "current_node_id",
+          "is_ai_speaking",
+          "lexicon_pack_ids"
+        ],
+        "title": "VoiceRoomOut"
+      },
+      "VoiceTurnOut": {
+        "properties": {
+          "room_id": {
+            "type": "string",
+            "title": "Room Id"
+          },
+          "resolved_speaker_id": {
+            "type": "string",
+            "title": "Resolved Speaker Id"
+          },
+          "speaker_tier": {
+            "type": "string",
+            "title": "Speaker Tier"
+          },
+          "normalized_utterance": {
+            "type": "string",
+            "title": "Normalized Utterance"
+          },
+          "active_node_id": {
+            "type": "string",
+            "title": "Active Node Id"
+          },
+          "branched_tangent": {
+            "type": "boolean",
+            "title": "Branched Tangent"
+          },
+          "barge_in_command": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Barge In Command"
+          },
+          "barge_in_action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Barge In Action"
+          }
+        },
+        "type": "object",
+        "required": [
+          "room_id",
+          "resolved_speaker_id",
+          "speaker_tier",
+          "normalized_utterance",
+          "active_node_id",
+          "branched_tangent"
+        ],
+        "title": "VoiceTurnOut"
+      },
+      "VoiceTurnRequest": {
+        "properties": {
+          "raw_utterance": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Raw Utterance"
+          },
+          "vad_confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Vad Confidence",
+            "default": 1.0
+          },
+          "rms_db": {
+            "type": "number",
+            "title": "Rms Db",
+            "default": -20.0
+          },
+          "new_tangent_topic": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Tangent Topic"
+          }
+        },
+        "type": "object",
+        "required": [
+          "raw_utterance"
+        ],
+        "title": "VoiceTurnRequest"
       }
     },
     "securitySchemes": {
