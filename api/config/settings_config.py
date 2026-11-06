@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     SENTRY_TRACES_SAMPLE_RATE: float = 0.0
     OTEL_EXPORTER_OTLP_ENDPOINT: Optional[str] = None
 
+    # SquelchGrip Voice OS (remote voice engine; in-process fallback when unset/unreachable)
+    SQUELCHGRIP_URL: str = "http://127.0.0.1:8000"
+    SQUELCHGRIP_API_KEY: Optional[str] = None
+
     # App Metadata
     APP_NAME: str = "f1ndr API"
     VERSION: str = "1.0.0"
